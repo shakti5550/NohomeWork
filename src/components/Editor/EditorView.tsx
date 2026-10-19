@@ -40,6 +40,23 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     saveNotebook(updated);
   };
 
+  const stopDrawing = () => {
+    if (!isDrawingRef.current || !currentStrokeRef.current) return;
+    isDrawingRef.current = false;
+
+    const stroke = currentStrokeRef.current;
+    currentStrokeRef.current = null;
+
+    const updatedStrokes = [...currentPage.strokes, stroke];
+    const updatedPages = [...notebook.pages];
+    updatedPages[currentPageIndex] = {
+      ...currentPage,
+      strokes: updatedStrokes
+    };
+
+    updateCurrentNotebook(updatedPages);
+  };
+
   // Keep a ref to the latest stopDrawing so window-level listeners always
   // call the current version (avoids stale closures from the empty-deps effect).
   const stopDrawingRef = useRef(stopDrawing);
@@ -205,23 +222,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     ctx.lineTo(x, y);
     ctx.stroke();
     ctx.restore();
-  };
-
-  const stopDrawing = () => {
-    if (!isDrawingRef.current || !currentStrokeRef.current) return;
-    isDrawingRef.current = false;
-
-    const stroke = currentStrokeRef.current;
-    currentStrokeRef.current = null;
-
-    const updatedStrokes = [...currentPage.strokes, stroke];
-    const updatedPages = [...notebook.pages];
-    updatedPages[currentPageIndex] = {
-      ...currentPage,
-      strokes: updatedStrokes
-    };
-
-    updateCurrentNotebook(updatedPages);
   };
 
   const eraseStrokeAt = (x: number, y: number) => {
