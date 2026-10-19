@@ -3,16 +3,15 @@ import {
   Box, Card, CardContent, Typography, TextField, Button,
   Divider, IconButton, InputAdornment, Link, Alert
 } from '@mui/material';
-import { Eye, EyeOff, ArrowLeft, Google } from 'lucide-react';
+import { Eye, EyeOff, Google } from 'lucide-react';
 import { AppLogo } from '../AppLogo';
 import { supabase, isSupabaseConfigured } from '../../storage/supabaseClient';
 
 interface AuthPageProps {
-  onBack: () => void;
   onSuccess?: () => void;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onSuccess }) => {
+export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -102,22 +101,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onSuccess }) => {
         position: 'relative',
       }}
     >
-      {/* Back button */}
-      <Button
-        startIcon={<ArrowLeft size={18} />}
-        onClick={onBack}
-        sx={{
-          position: 'absolute',
-          top: 24,
-          left: 24,
-          textTransform: 'none',
-          color: 'text.secondary',
-          fontWeight: 600,
-        }}
-      >
-        Back to App
-      </Button>
-
       {/* Main Auth Card */}
       <Card
         sx={{

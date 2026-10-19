@@ -5,12 +5,40 @@ import { EditorView } from './components/Editor/EditorView';
 import { Notebook, getNotebook, saveNotebook } from './storage/db';
 import { AuthPage } from './components/Auth/AuthPage';
 import { CustomThemeProvider } from './ThemeContext';
+import { supabase } from './storage/supabaseClient';
 
 const AppContent: React.FC = () => {
   const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
   const [activeNotebook, setActiveNotebook] = useState<Notebook | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check initial auth state
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+      setAuthChecked(true);
+      if (!session) {
+        navigate('/auth');
+      }
+    };
+    checkAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        setIsAuthenticated(true);
+      } else if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        navigate('/auth');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   useEffect(() => {
     if (activeNotebookId) {
@@ -22,7 +50,8 @@ const AppContent: React.FC = () => {
     }
   }, [activeNotebookId]);
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
     navigate('/auth');
   };
 
@@ -30,11 +59,29 @@ const AppContent: React.FC = () => {
     navigate('/');
   };
 
+  // Show loading state while checking auth
+  if (!authChecked) {
+    return (
+      <div style={{
+        width: '100vw',
+        height: '100vh',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        background: '#0f172a',
+        color: '#f8fafc',
+        fontSize: '18px'
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
   return (
     <div style={{ width: '100vw', height: '100vh', margin: 0, padding: 0, overflow: 'hidden' }}>
       {location.pathname === '/auth' ? (
-        <AuthPage onBack={() => navigate('/')} onSuccess={handleSignInSuccess} />
-      ) : (
+        <AuthPage onSuccess={handleSignInSuccess} />
+      ) : isAuthenticated ? (
         activeNotebook ? (
           <EditorView
             notebook={activeNotebook}
@@ -47,7 +94,7 @@ const AppContent: React.FC = () => {
             onSignOut={handleSignOut}
           />
         )
-      )}
+      ) : null}
     </div>
   );
 };

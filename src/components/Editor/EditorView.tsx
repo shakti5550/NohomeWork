@@ -250,18 +250,29 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default', color: 'text.primary' }}>
       {/* Top Toolbar */}
-      <Box sx={{ display: 'flex', alignItems: 'center', px: 2, py: 1, bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider', gap: 2, zIndex: 10 }}>
+      <Box sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        px: { xs: 1, md: 2 },
+        py: 1,
+        bgcolor: 'background.paper',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
+        gap: { xs: 1, md: 2 },
+        zIndex: 10,
+      }}>
         <Tooltip title="Back to Library">
-          <IconButton onClick={onBack} color="inherit">
+          <IconButton onClick={onBack} color="inherit" size="small">
             <ArrowLeft size={20} />
           </IconButton>
         </Tooltip>
 
-        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '16px', color: 'text.primary', mr: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '15px', color: 'text.primary', whiteSpace: 'nowrap' }}>
           {notebook.title}
         </Typography>
 
-        <Divider orientation="vertical" flexItem sx={{ my: 1 }} />
+        <Divider orientation="vertical" flexItem sx={{ my: 0.5, display: { xs: 'none', sm: 'block' } }} />
 
         {/* Tools */}
         <Box sx={{ display: 'flex', gap: 0.5, bgcolor: 'action.hover', p: 0.5, borderRadius: 2 }}>
@@ -314,11 +325,11 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           ))}
         </Box>
 
-        <Divider orientation="vertical" flexItem sx={{ my: 1 }} />
+        <Divider orientation="vertical" flexItem sx={{ my: 0.5, display: { xs: 'none', sm: 'block' } }} />
 
         {/* Width Slider */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: 140 }}>
-          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500 }}>Size</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: 80, md: 140 } }}>
+          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>Size</Typography>
           <Slider
             size="small"
             value={width}
@@ -329,14 +340,14 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           />
         </Box>
 
-        <Divider orientation="vertical" flexItem sx={{ my: 1 }} />
+        <Divider orientation="vertical" flexItem sx={{ my: 0.5, display: { xs: 'none', sm: 'block' } }} />
 
         {/* Template Selector */}
         <Select
           size="small"
           value={currentPage.template}
           onChange={(e) => handleTemplateChange(e.target.value)}
-          sx={{ fontSize: '13px', borderRadius: 2, bgcolor: 'background.paper' }}
+          sx={{ fontSize: '13px', borderRadius: 2, bgcolor: 'background.paper', minWidth: { xs: 110, md: 130 } }}
         >
           <MenuItem value="ruled">Ruled Paper</MenuItem>
           <MenuItem value="grid">Grid Paper</MenuItem>
@@ -345,7 +356,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         </Select>
 
         {/* Page Navigation */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <IconButton
             size="small"
             disabled={currentPageIndex === 0}
@@ -353,8 +364,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             color="inherit"
           >
             <ChevronLeft size={18} />
-          </IconButton>          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-            {currentPageIndex + 1} / {notebook.pages.length}
+          </IconButton>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap', minWidth: '36px', textAlign: 'center' }}>
+            {currentPageIndex + 1}/{notebook.pages.length}
           </Typography>
           <IconButton
             size="small"
@@ -369,18 +381,18 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             variant="outlined"
             startIcon={<Plus size={14} />}
             onClick={handleAddPage}
-            sx={{ textTransform: 'none', borderRadius: 2, ml: 1 }}
+            sx={{ textTransform: 'none', borderRadius: 2, ml: 0.5, py: 0.5, px: 1 }}
           >
             Page
           </Button>
-          <IconButton size="small" onClick={handleDeletePage} sx={{ color: '#ef4444' }}>
-            <Trash2 size={16} />
+          <IconButton size="small" onClick={handleDeletePage} sx={{ color: '#ef4444', ml: 0.5 }}>
+            <Trash2 size={18} />
           </IconButton>
         </Box>
       </Box>
 
       {/* Canvas Area */}
-      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: { xs: 1, md: 4 }, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: { xs: 0.5, sm: 1, md: 4 }, overflow: 'auto', pb: { xs: 2, sm: 4 } }}>
         <Box
           sx={{
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
@@ -389,8 +401,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             bgcolor: mode === 'dark' ? '#1e293b' : '#fff',
             position: 'relative',
             width: '100%',
-            maxWidth: { xs: '96vw', sm: '90vw', md: '800px' },
-            maxHeight: { xs: '70vh', sm: '80vh', md: 'none' },
+            maxWidth: { xs: '98vw', sm: '94vw', md: '800px' },
+            maxHeight: { xs: '82vh', sm: '88vh', md: 'none' },
             aspectRatio: '4 / 5',
           }}
         >
