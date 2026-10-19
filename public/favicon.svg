@@ -1,0 +1,28 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg_grad" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#2563EB" />
+      <stop offset="1" stopColor="#1D4ED8" />
+    </linearGradient>
+  </defs>
+
+  <!-- Blue Rounded Square filling the whole space -->
+  <rect width="128" height="128" rx="28" fill="url(#bg_grad)" />
+
+  <!-- Inner Soft Sheet of Paper - Enlarged -->
+  <rect x="32" y="28" width="64" height="72" rx="12" fill="#3B82F6" fill-opacity="0.8" />
+
+  <!-- Sheet Lines - Enlarged -->
+  <line x1="42" y1="46" x2="72" y2="46" stroke="white" stroke-width="4" stroke-linecap="round" stroke-opacity="0.95" />
+  <line x1="42" y1="58" x2="72" y2="58" stroke="white" stroke-width="4" stroke-linecap="round" stroke-opacity="0.95" />
+  <line x1="42" y1="70" x2="60" y2="70" stroke="white" stroke-width="4" stroke-linecap="round" stroke-opacity="0.95" />
+
+  <!-- Yellow Stylus / Folding 'N' Stroke - Enlarged to be prominent -->
+  <path
+    d="M48 94 L66 52 L88 40 L74 88"
+    stroke="#FBBF24"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
