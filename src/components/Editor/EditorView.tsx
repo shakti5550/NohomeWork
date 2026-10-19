@@ -40,12 +40,17 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     saveNotebook(updated);
   };
 
+  // Keep a ref to the latest stopDrawing so window-level listeners always
+  // call the current version (avoids stale closures from the empty-deps effect).
+  const stopDrawingRef = useRef(stopDrawing);
+  stopDrawingRef.current = stopDrawing;
+
   // Ensure the stroke is committed if the pointer leaves the canvas area
-  // (e.g. user lifts finger off-screen). Using window listeners avoids the
-  // stale-closure problem because stopDrawing reads from refs.
+  // (e.g. user lifts finger off-screen). Window-level listeners catch the
+  // pointerup even when the finger moves slightly off the canvas.
   useEffect(() => {
-    const handleWindowPointerUp = () => stopDrawing();
-    const handleWindowPointerCancel = () => stopDrawing();
+    const handleWindowPointerUp = () => stopDrawingRef.current();
+    const handleWindowPointerCancel = () => stopDrawingRef.current();
     window.addEventListener('pointerup', handleWindowPointerUp);
     window.addEventListener('pointercancel', handleWindowPointerCancel);
     return () => {
