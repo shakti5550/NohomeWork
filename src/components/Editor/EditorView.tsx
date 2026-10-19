@@ -40,7 +40,16 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     saveNotebook(updated);
   };
 
-  const stopDrawing = () => {
+  const stopDrawing = (e?: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (canvas && e) {
+      try {
+        canvas.releasePointerCapture(e.pointerId);
+      } catch {
+        // Pointer capture may not be active; ignore.
+      }
+    }
+
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
     isDrawingRef.current = false;
 
@@ -180,6 +189,18 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       return;
     }
 
+    // Prevent the browser from starting a scroll or text selection
+    // while the user is scribbling fast.
+    e.preventDefault();
+
+    // Capture the pointer so we receive all move/up/cancel events
+    // even if the finger drifts slightly off the canvas.
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {
+      // Pointer capture may fail in some browsers; drawing still works.
+    }
+
     isDrawingRef.current = true;
     const newStroke: Stroke = {
       id: 'st_' + Math.random().toString(36).substring(2, 9),
@@ -199,6 +220,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    e.preventDefault();
 
     const stroke = currentStrokeRef.current;
     const updatedPoints = [...stroke.points, { x, y }];
