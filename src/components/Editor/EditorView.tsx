@@ -380,14 +380,18 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       </Box>
 
       {/* Canvas Area */}
-      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4, overflow: 'auto' }}>
+      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: { xs: 1, md: 4 }, overflow: 'auto' }}>
         <Box
           sx={{
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
             borderRadius: 2,
             overflow: 'hidden',
             bgcolor: mode === 'dark' ? '#1e293b' : '#fff',
-            position: 'relative'
+            position: 'relative',
+            width: '100%',
+            maxWidth: { xs: '96vw', sm: '90vw', md: '800px' },
+            maxHeight: { xs: '70vh', sm: '80vh', md: 'none' },
+            aspectRatio: '4 / 5',
           }}
         >
           <canvas
@@ -401,7 +405,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
               height: '100%',
               display: 'block',
               cursor: tool === 'eraser' ? 'cell' : 'crosshair',
-              touchAction: 'none'
+              touchAction: 'none',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
             }}
           />
         </Box>
