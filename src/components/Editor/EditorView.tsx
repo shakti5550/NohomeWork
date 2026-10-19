@@ -40,10 +40,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     saveNotebook(updated);
   };
 
-  // Drawing state lives in refs to avoid stale closures
-  const isDrawingRef = useRef(false);
-  const currentStrokeRef = useRef<Stroke | null>(null);
-
   const stopDrawing = () => {
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
     isDrawingRef.current = false;
