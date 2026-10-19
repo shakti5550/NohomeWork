@@ -40,6 +40,10 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     saveNotebook(updated);
   };
 
+  // Drawing state lives in refs to avoid stale closures
+  const isDrawingRef = useRef(false);
+  const currentStrokeRef = useRef<Stroke | null>(null);
+
   const stopDrawing = () => {
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
     isDrawingRef.current = false;
@@ -57,22 +61,22 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     updateCurrentNotebook(updatedPages);
   };
 
-  // Keep a ref to the latest stopDrawing so window-level listeners always
-  // call the current version (avoids stale closures from the empty-deps effect).
-  const stopDrawingRef = useRef(stopDrawing);
-  stopDrawingRef.current = stopDrawing;
-
   // Ensure the stroke is committed if the pointer leaves the canvas area
-  // (e.g. user lifts finger off-screen). Window-level listeners catch the
-  // pointerup even when the finger moves slightly off the canvas.
+  // (e.g. user lifts finger off-screen). Use a single listener for both
+  // pointerup and pointercancel to catch all cases.
   useEffect(() => {
-    const handleWindowPointerUp = () => stopDrawingRef.current();
-    const handleWindowPointerCancel = () => stopDrawingRef.current();
-    window.addEventListener('pointerup', handleWindowPointerUp);
-    window.addEventListener('pointercancel', handleWindowPointerCancel);
+    const handlePointerEvent = (e: PointerEvent) => {
+      if (e.type === 'pointercancel') {
+        // On touch devices, pointercancel is fired when the pointer leaves
+        // the canvas area or is moved away from it.
+        stopDrawing();
+      }
+    };
+    window.addEventListener('pointerup', handlePointerEvent);
+    window.addEventListener('pointercancel', handlePointerEvent);
     return () => {
-      window.removeEventListener('pointerup', handleWindowPointerUp);
-      window.removeEventListener('pointercancel', handleWindowPointerCancel);
+      window.removeEventListener('pointerup', handlePointerEvent);
+      window.removeEventListener('pointercancel', handlePointerEvent);
     };
   }, []);
 
@@ -436,6 +440,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             onPointerDown={startDrawing}
             onPointerMove={draw}
             onPointerUp={stopDrawing}
+            onPointerCancel={stopDrawing}
             style={{
               width: '100%',
               height: '100%',
