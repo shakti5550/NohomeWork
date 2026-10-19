@@ -20,8 +20,11 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const [tool, setTool] = useState<'pen' | 'highlighter' | 'eraser'>('pen');
   const [color, setColor] = useState('#000000');
   const [width, setWidth] = useState(3);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
+
+  // Drawing state lives in refs so event handlers (including document-level
+  // pointerup/pointercancel) always see the latest values without stale closures.
+  const isDrawingRef = useRef(false);
+  const currentStrokeRef = useRef<Stroke | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const currentPage: Page = notebook.pages[currentPageIndex] || notebook.pages[0];
@@ -36,6 +39,20 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     onUpdateNotebook(updated);
     saveNotebook(updated);
   };
+
+  // Ensure the stroke is committed if the pointer leaves the canvas area
+  // (e.g. user lifts finger off-screen). Using window listeners avoids the
+  // stale-closure problem because stopDrawing reads from refs.
+  useEffect(() => {
+    const handleWindowPointerUp = () => stopDrawing();
+    const handleWindowPointerCancel = () => stopDrawing();
+    window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', handleWindowPointerCancel);
+    return () => {
+      window.removeEventListener('pointerup', handleWindowPointerUp);
+      window.removeEventListener('pointercancel', handleWindowPointerCancel);
+    };
+  }, []);
 
   // Redraw canvas whenever page or strokes change
   useEffect(() => {
@@ -141,7 +158,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       return;
     }
 
-    setIsDrawing(true);
+    isDrawingRef.current = true;
     const newStroke: Stroke = {
       id: 'st_' + Math.random().toString(36).substring(2, 9),
       tool,
@@ -150,33 +167,34 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       opacity: tool === 'highlighter' ? 0.4 : 1.0,
       points: [{ x, y }]
     };
-    setCurrentStroke(newStroke);
+    currentStrokeRef.current = newStroke;
   };
 
   const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !currentStroke) return;
+    if (!isDrawingRef.current || !currentStrokeRef.current) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const updatedPoints = [...currentStroke.points, { x, y }];
-    setCurrentStroke({ ...currentStroke, points: updatedPoints });
+    const stroke = currentStrokeRef.current;
+    const updatedPoints = [...stroke.points, { x, y }];
+    currentStrokeRef.current = { ...stroke, points: updatedPoints };
 
     // Live preview render
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.save();
     ctx.beginPath();
-    ctx.strokeStyle = currentStroke.color;
-    ctx.lineWidth = currentStroke.width;
+    ctx.strokeStyle = stroke.color;
+    ctx.lineWidth = stroke.width;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalAlpha = currentStroke.opacity;
-    if (currentStroke.tool === 'highlighter') ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = stroke.opacity;
+    if (stroke.tool === 'highlighter') ctx.globalCompositeOperation = 'multiply';
 
-    const pts = currentStroke.points;
+    const pts = stroke.points;
     const lastPt = pts[pts.length - 1];
     ctx.moveTo(lastPt.x, lastPt.y);
     ctx.lineTo(x, y);
@@ -185,10 +203,13 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   };
 
   const stopDrawing = () => {
-    if (!isDrawing || !currentStroke) return;
-    setIsDrawing(false);
+    if (!isDrawingRef.current || !currentStrokeRef.current) return;
+    isDrawingRef.current = false;
 
-    const updatedStrokes = [...currentPage.strokes, currentStroke];
+    const stroke = currentStrokeRef.current;
+    currentStrokeRef.current = null;
+
+    const updatedStrokes = [...currentPage.strokes, stroke];
     const updatedPages = [...notebook.pages];
     updatedPages[currentPageIndex] = {
       ...currentPage,
@@ -196,7 +217,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     };
 
     updateCurrentNotebook(updatedPages);
-    setCurrentStroke(null);
   };
 
   const eraseStrokeAt = (x: number, y: number) => {
@@ -411,7 +431,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             onPointerDown={startDrawing}
             onPointerMove={draw}
             onPointerUp={stopDrawing}
-            onPointerLeave={stopDrawing}
             style={{
               width: '100%',
               height: '100%',
