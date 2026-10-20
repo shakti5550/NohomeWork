@@ -22,8 +22,12 @@ async function generate() {
 
   for (const { size, name } of SIZES) {
     const outPath = path.join(PUBLIC_DIR, name);
+    // Use fit: 'contain' so the full artwork is always preserved, even if the
+    // SVG's viewBox or aspect ratio changes in the future. The blue background
+    // fills any transparent padding (e.g. the rounded-square corners) so iOS
+    // doesn't render them as a black border.
     await sharp(SVG_PATH)
-      .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .resize(size, size, { fit: 'contain', background: { r: 37, g: 99, b: 235 } })
       .png({ quality: 100 })
       .toFile(outPath);
     console.log(`Generated ${outPath} (${size}x${size})`);
