@@ -22,12 +22,24 @@ async function generate() {
 
   for (const { size, name } of SIZES) {
     const outPath = path.join(PUBLIC_DIR, name);
-    // Use fit: 'contain' so the full artwork is always preserved, even if the
-    // SVG's viewBox or aspect ratio changes in the future. The blue background
-    // fills any transparent padding (e.g. the rounded-square corners) so iOS
-    // doesn't render them as a black border.
-    await sharp(SVG_PATH)
-      .resize(size, size, { fit: 'contain', background: { r: 37, g: 99, b: 235 } })
+    // Create a solid blue square first, then composite the SVG on top.
+    // This guarantees every pixel is blue — no transparent corners for
+    // iOS to render as a black border.
+    const blueBg = sharp({
+      create: {
+        width: size,
+        height: size,
+        channels: 4,
+        background: { r: 37, g: 99, b: 235, alpha: 255 },
+      },
+    }).png();
+
+    const svgBuffer = await sharp(SVG_PATH)
+      .resize(size, size, { fit: 'contain' })
+      .toBuffer();
+
+    await blueBg
+      .composite([{ input: svgBuffer }])
       .png({ quality: 100 })
       .toFile(outPath);
     console.log(`Generated ${outPath} (${size}x${size})`);
