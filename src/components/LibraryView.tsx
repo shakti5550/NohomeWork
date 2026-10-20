@@ -166,8 +166,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' } }}>Documents</Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            {/* Profile Dropdown */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1.5 }}>
+            {/* Profile Dropdown - top right corner, above search bar */}
             <ProfileDropdown onSignOut={onSignOut} />
 
             {/* Search Bar */}
