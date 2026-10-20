@@ -1,9 +1,9 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   Box, IconButton, Typography, Select, MenuItem, Slider, Tooltip, Divider, Button
 } from '@mui/material';
 import {
-  ArrowLeft, Undo, Redo, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Save
+  ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Notebook, Page, Stroke, saveNotebook } from '../../storage/db';
 import { useThemeMode } from '../../ThemeContext';
@@ -21,113 +21,53 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const [color, setColor] = useState('#000000');
   const [width, setWidth] = useState(3);
 
-  // Drawing state lives in refs so event handlers (including document-level
-  // pointerup/pointercancel) always see the latest values without stale closures.
+  // Drawing state lives in refs so pointer handlers never go stale and a
+  // stroke commit does NOT trigger a React re-render (that was what made
+  // fast writing drop strokes — every lift caused a full redraw + IndexedDB
+  // write that blocked the next touch-down).
   const isDrawingRef = useRef(false);
   const currentStrokeRef = useRef<Stroke | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const currentPage: Page = notebook.pages[currentPageIndex] || notebook.pages[0];
 
-  // Save current notebook changes
-  const updateCurrentNotebook = (newPages: Page[]) => {
+  // Latest values for use inside long-lived callbacks / timers.
+  const notebookRef = useRef(notebook);
+  notebookRef.current = notebook;
+  const pageIndexRef = useRef(currentPageIndex);
+  pageIndexRef.current = currentPageIndex;
+  const saveTimerRef = useRef<number | null>(null);
+
+  // Commit page changes to React state immediately (cheap) but debounce the
+  // IndexedDB write so rapid strokes don't queue up dozens of saves/redraws.
+  const updateCurrentNotebook = useCallback((newPages: Page[], persistDelay = 400) => {
     const updated: Notebook = {
-      ...notebook,
+      ...notebookRef.current,
       pages: newPages,
       updatedAt: Date.now()
     };
     onUpdateNotebook(updated);
-    saveNotebook(updated);
-  };
 
-  const stopDrawing = (e?: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (canvas && e) {
-      try {
-        canvas.releasePointerCapture(e.pointerId);
-      } catch {
-        // Pointer capture may not be active; ignore.
-      }
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
     }
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      saveNotebook(updated);
+    }, persistDelay);
+  }, [onUpdateNotebook]);
 
-    if (!isDrawingRef.current || !currentStrokeRef.current) return;
-    isDrawingRef.current = false;
-
-    const stroke = currentStrokeRef.current;
-    currentStrokeRef.current = null;
-
-    const updatedStrokes = [...currentPage.strokes, stroke];
-    const updatedPages = [...notebook.pages];
-    updatedPages[currentPageIndex] = {
-      ...currentPage,
-      strokes: updatedStrokes
-    };
-
-    updateCurrentNotebook(updatedPages);
-  };
-
-  // Ensure the stroke is committed if the pointer leaves the canvas area
-  // (e.g. user lifts finger off-screen). Use a single listener for both
-  // pointerup and pointercancel to catch all cases.
+  // Flush any pending save when leaving the editor.
   useEffect(() => {
-    const handlePointerEvent = (e: PointerEvent) => {
-      if (e.type === 'pointercancel') {
-        // On touch devices, pointercancel is fired when the pointer leaves
-        // the canvas area or is moved away from it.
-        stopDrawing();
-      }
-    };
-    window.addEventListener('pointerup', handlePointerEvent);
-    window.addEventListener('pointercancel', handlePointerEvent);
     return () => {
-      window.removeEventListener('pointerup', handlePointerEvent);
-      window.removeEventListener('pointercancel', handlePointerEvent);
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+        saveNotebook(notebookRef.current);
+      }
     };
   }, []);
-
-  // Redraw canvas whenever page or strokes change
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Handle high DPI displays
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    // Clear canvas
-    ctx.clearRect(0, 0, rect.width, rect.height);
-
-    // Draw Template Background
-    drawTemplate(ctx, rect.width, rect.height, currentPage.template);
-
-    // Draw all strokes
-    currentPage.strokes.forEach((stroke) => {
-      if (stroke.points.length === 0) return;
-      ctx.save();
-      ctx.beginPath();
-      ctx.strokeStyle = stroke.color;
-      ctx.lineWidth = stroke.width;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.globalAlpha = stroke.opacity;
-
-      if (stroke.tool === 'highlighter') {
-        ctx.globalCompositeOperation = 'multiply';
-      }
-
-      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-      for (let i = 1; i < stroke.points.length; i++) {
-        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-      }
-      ctx.stroke();
-      ctx.restore();
-    });
-  }, [currentPage, notebook]);
 
   const drawTemplate = (ctx: CanvasRenderingContext2D, width: number, height: number, template: string) => {
     ctx.fillStyle = '#ffffff';
@@ -177,9 +117,85 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     }
   };
 
+  const drawStroke = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
+    if (stroke.points.length === 0) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle = stroke.color;
+    ctx.lineWidth = stroke.width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = stroke.opacity;
+    if (stroke.tool === 'highlighter') {
+      ctx.globalCompositeOperation = 'multiply';
+    }
+    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+    for (let i = 1; i < stroke.points.length; i++) {
+      ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  // Size the backing store once per resize; only repaint strokes when the
+  // committed page data changes — never while a stroke is in progress, so
+  // the live ink isn't wiped mid-motion and the main thread stays free for
+  // incoming pointer events.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const bw = Math.round(rect.width * dpr);
+    const bh = Math.round(rect.height * dpr);
+
+    if (canvas.width !== bw || canvas.height !== bh) {
+      canvas.width = bw;
+      canvas.height = bh;
+    }
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    drawTemplate(ctx, rect.width, rect.height, currentPage.template);
+
+    if (isDrawingRef.current) return; // live stroke owns the canvas right now
+
+    currentPage.strokes.forEach((stroke) => drawStroke(ctx, stroke));
+  }, [currentPage]);
+
+  const stopDrawing = () => {
+    if (!isDrawingRef.current || !currentStrokeRef.current) return;
+    isDrawingRef.current = false;
+    activePointerIdRef.current = null;
+
+    const stroke = currentStrokeRef.current;
+    currentStrokeRef.current = null;
+
+    const nb = notebookRef.current;
+    const idx = pageIndexRef.current;
+    const page = nb.pages[idx];
+    const updatedPages = [...nb.pages];
+    updatedPages[idx] = { ...page, strokes: [...page.strokes, stroke] };
+    updateCurrentNotebook(updatedPages);
+  };
+
   const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // A stray pointerdown while a stroke is somehow still open: close it first.
+    if (isDrawingRef.current) stopDrawing();
+
+    e.preventDefault();
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {
+      // Pointer capture may fail in some browsers; drawing still works.
+    }
+
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -189,18 +205,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       return;
     }
 
-    // Prevent the browser from starting a scroll or text selection
-    // while the user is scribbling fast.
-    e.preventDefault();
-
-    // Capture the pointer so we receive all move/up/cancel events
-    // even if the finger drifts slightly off the canvas.
-    try {
-      canvas.setPointerCapture(e.pointerId);
-    } catch {
-      // Pointer capture may fail in some browsers; drawing still works.
-    }
-
+    activePointerIdRef.current = e.pointerId;
     isDrawingRef.current = true;
     const newStroke: Stroke = {
       id: 'st_' + Math.random().toString(36).substring(2, 9),
@@ -215,21 +220,25 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
   const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
+    if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    e.preventDefault();
+
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    e.preventDefault();
-
     const stroke = currentStrokeRef.current;
-    const updatedPoints = [...stroke.points, { x, y }];
-    currentStrokeRef.current = { ...stroke, points: updatedPoints };
+    const lastPt = stroke.points[stroke.points.length - 1];
+    stroke.points.push({ x, y });
 
-    // Live preview render
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    // Incremental render: draw only the newest segment onto the existing
+    // bitmap. No clearing, no re-render, no React state update.
     ctx.save();
     ctx.beginPath();
     ctx.strokeStyle = stroke.color;
@@ -238,14 +247,27 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     ctx.lineJoin = 'round';
     ctx.globalAlpha = stroke.opacity;
     if (stroke.tool === 'highlighter') ctx.globalCompositeOperation = 'multiply';
-
-    const pts = stroke.points;
-    const lastPt = pts[pts.length - 1];
     ctx.moveTo(lastPt.x, lastPt.y);
     ctx.lineTo(x, y);
     ctx.stroke();
     ctx.restore();
   };
+
+  const handleWindowPointerEnd = useCallback((e: PointerEvent) => {
+    if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
+    stopDrawing();
+  }, []);
+
+  // Catch lifts/cancels anywhere on the page (finger drifting off-canvas,
+  // palm rejection, system gestures) so drawing state always resets cleanly.
+  useEffect(() => {
+    window.addEventListener('pointerup', handleWindowPointerEnd);
+    window.addEventListener('pointercancel', handleWindowPointerEnd);
+    return () => {
+      window.removeEventListener('pointerup', handleWindowPointerEnd);
+      window.removeEventListener('pointercancel', handleWindowPointerEnd);
+    };
+  }, [handleWindowPointerEnd]);
 
   const eraseStrokeAt = (x: number, y: number) => {
     // Simple radius eraser
@@ -272,7 +294,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       strokes: []
     };
     const updatedPages = [...notebook.pages, newPage];
-    updateCurrentNotebook(updatedPages);
+    updateCurrentNotebook(updatedPages, 0);
     setCurrentPageIndex(updatedPages.length - 1);
   };
 
@@ -282,7 +304,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       return;
     }
     const updatedPages = notebook.pages.filter((_, idx) => idx !== currentPageIndex);
-    updateCurrentNotebook(updatedPages);
+    updateCurrentNotebook(updatedPages, 0);
     setCurrentPageIndex(Math.max(0, currentPageIndex - 1));
   };
 
@@ -292,7 +314,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       ...currentPage,
       template
     };
-    updateCurrentNotebook(updatedPages);
+    updateCurrentNotebook(updatedPages, 0);
   };
 
   return (

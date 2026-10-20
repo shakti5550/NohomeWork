@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   BrowserRouter as Router, Routes, Route, Navigate, useNavigate,
   useParams
@@ -52,11 +52,16 @@ const AppContent: React.FC = () => {
     navigate('/Home', { replace: true });
   };
 
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    navigate('/auth', { replace: true });
+  }, [navigate]);
+
   return (
     <Routes>
       <Route path="/auth" element={<AuthPage onSuccess={handleSignInSuccess} />} />
       <Route path="/Home" element={
-        <LibraryView onOpenNotebook={(id) => navigate('/Editor/' + id)} />
+        <LibraryView onOpenNotebook={(id) => navigate('/Editor/' + id)} onSignOut={handleSignOut} />
       } />
       <Route path="/Editor/:id" element={<EditorRoute />} />
       <Route path="*" element={<Navigate to="/Home" replace />} />

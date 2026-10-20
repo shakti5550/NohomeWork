@@ -10,6 +10,7 @@ import {
 import { Notebook, getAllNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook } from '../storage/db';
 import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
+import { ProfileDropdown } from './Auth/ProfileDropdown';
 
 interface LibraryViewProps {
   onOpenNotebook: (notebookId: string) => void;
@@ -119,13 +120,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             <ListItemText primary="Folders" />
           </ListItemButton>
         </ListItem>
-        <ListItem disablePadding>
-          <ListItemButton sx={{ borderRadius: 2, color: 'text.secondary' }} onClick={onSignOut}>
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><LogOut size={20} /></ListItemIcon>
-            <ListItemText primary="Sign In / Out" />
-          </ListItemButton>
-        </ListItem>
-      </List>
+              </List>
 
       <Box sx={{ pt: 2, pb: 1 }}>
         <Button
@@ -171,33 +166,39 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' } }}>Documents</Typography>
           </Box>
 
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            bgcolor: 'background.paper',
-            px: 2,
-            py: 0.5,
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            width: { xs: '100%', sm: 300 }
-          }}>
-            <Search size={18} color="#94a3b8" />
-            <input
-              type="text"
-              placeholder="Search notebooks..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                border: 'none',
-                outline: 'none',
-                padding: '8px',
-                width: '100%',
-                fontSize: '14px',
-                background: 'transparent',
-                color: mode === 'dark' ? '#f8fafc' : '#0f172a'
-              }}
-            />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            {/* Profile Dropdown */}
+            <ProfileDropdown onSignOut={onSignOut} />
+
+            {/* Search Bar */}
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              bgcolor: 'background.paper',
+              px: 2,
+              py: 0.5,
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              width: { xs: '100%', sm: 300 }
+            }}>
+              <Search size={18} color="#94a3b8" />
+              <input
+                type="text"
+                placeholder="Search notebooks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  border: 'none',
+                  outline: 'none',
+                  padding: '8px',
+                  width: '100%',
+                  fontSize: '14px',
+                  background: 'transparent',
+                  color: mode === 'dark' ? '#f8fafc' : '#0f172a'
+                }}
+              />
+            </Box>
           </Box>
         </Box>
 
