@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS notebooks (
   cover_color text DEFAULT '#1976d2',
   cover_style text DEFAULT 'classic',
   created_at bigint NOT NULL,
-  updated_at bigint NOT NULL
+  updated_at bigint NOT NULL,
+  version bigint NOT NULL DEFAULT 1,
 );
 
 -- 2. Pages table (stores page data with strokes as JSONB)
@@ -20,7 +21,8 @@ CREATE TABLE IF NOT EXISTS pages (
   page_number int NOT NULL,
   template text DEFAULT 'ruled',
   strokes jsonb DEFAULT '[]'::jsonb,
-  updated_at bigint NOT NULL
+  updated_at bigint NOT NULL,
+  version bigint NOT NULL DEFAULT 1,
 );
 
 -- 3. Enable real-time replication so changes sync instantly across devices

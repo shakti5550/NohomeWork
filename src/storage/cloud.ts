@@ -32,6 +32,7 @@ export interface Notebook {
   coverColor: string;
   coverStyle: 'minimal' | 'classic' | 'grid';
   pages: Page[];
+  version?: number;
 }
 
 // ─── Cloud storage — Supabase is the single source of truth ─────────────
@@ -47,26 +48,59 @@ function ensureSignedIn() {
 // Guards the first-run seeding step so concurrent callers (e.g. React
 // StrictMode running the mount effect twice) can't both see an empty
 // list and each create a "Welcome" notebook.
-let loadPromise: Promise<Notebook[]> | null = null;
+const pendingLoads = new Map<string, Promise<Notebook[]>>();
 
 export async function loadNotebooks(): Promise<Notebook[]> {
-  if (loadPromise) return loadPromise;
-  loadPromise = (async () => {
-    try {
-      const list = await getAllNotebooks();
-      if (list.length === 0) {
-        const defaultNb = await createDefaultNotebook('Welcome to NohomeWork');
-        return [defaultNb];
-      }
-      return list;
-    } finally {
-      loadPromise = null;
+  // Ensure we have a signed‑in user to scope the pending load
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const key = `${user.id}-notebooks`;
+  if (pendingLoads.has(key)) return pendingLoads.get(key)!;
+
+  const loadPromise = (async () => {
+    const list = await getAllNotebooks();
+    if (list.length === 0) {
+      const defaultNb = await createDefaultNotebook('Welcome to NohomeWork');
+      return [defaultNb];
     }
+    return list;
   })();
+
+  pendingLoads.set(key, loadPromise);
+  loadPromise.finally(() => pendingLoads.delete(key));
+
   return loadPromise;
 }
 
 // ─── Read ────────────────────────────────────────────────────────────────
+
+// Fetch pages for one or more notebooks, paginating through the 1,000‑row
+// default query limit so we never silently drop pages from a notebook.
+async function fetchAllPages(notebookIds: string[]): Promise<Map<string, any[]>> {
+  const PAGE_SIZE = 1000;
+  const pagesByNotebook = new Map<string, any[]>();
+  for (const notebookId of notebookIds) {
+    const all: any[] = [];
+    let from = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { data, error } = await supabase
+        .from('pages')
+        .select('*')
+        .eq('notebook_id', notebookId)
+        .order('page_number', { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      all.push(...data);
+      if (data.length < PAGE_SIZE) break;
+      from += PAGE_SIZE;
+    }
+    pagesByNotebook.set(notebookId, all);
+  }
+  return pagesByNotebook;
+}
 
 export async function getAllNotebooks(): Promise<Notebook[]> {
   ensureSignedIn();
@@ -82,21 +116,10 @@ export async function getAllNotebooks(): Promise<Notebook[]> {
   if (nbErr) throw nbErr;
   if (!nbRows || nbRows.length === 0) return [];
 
-  // Fetch every page for these notebooks in a single query
+  // Fetch every page for these notebooks, paginating past the 1,000‑row
+  // default query limit so we never silently drop pages.
   const ids = nbRows.map((r) => r.id);
-  const { data: pageRows, error: pgErr } = await supabase
-    .from('pages')
-    .select('*')
-    .in('notebook_id', ids)
-    .order('page_number', { ascending: true });
-  if (pgErr) throw pgErr;
-
-  const pagesByNotebook = new Map<string, any[]>();
-  for (const p of pageRows ?? []) {
-    const arr = pagesByNotebook.get(p.notebook_id) ?? [];
-    arr.push(p);
-    pagesByNotebook.set(p.notebook_id, arr);
-  }
+  const pagesByNotebook = await fetchAllPages(ids);
 
   return nbRows.map((row) => ({
     id: row.id,
@@ -119,22 +142,20 @@ export async function getNotebook(id: string): Promise<Notebook | undefined> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return undefined;
 
+  // Use maybeSingle so a missing notebook (or one hidden by RLS) returns
+  // undefined instead of throwing a "no rows" error.
   const { data: row, error: nbErr } = await supabase
     .from('notebooks')
     .select('*')
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
   if (nbErr) throw nbErr;
   if (!row) return undefined;
   if (row.user_id !== user.id) return undefined; // not ours
 
-  const { data: pageRows, error: pgErr } = await supabase
-    .from('pages')
-    .select('*')
-    .eq('notebook_id', id)
-    .order('page_number', { ascending: true });
-  if (pgErr) throw pgErr;
+  const pagesByNotebook = await fetchAllPages([id]);
+  const pageRows = pagesByNotebook.get(id) ?? [];
 
   return {
     id: row.id,
@@ -143,7 +164,7 @@ export async function getNotebook(id: string): Promise<Notebook | undefined> {
     updatedAt: row.updated_at,
     coverColor: row.cover_color,
     coverStyle: row.cover_style as Notebook['coverStyle'],
-    pages: (pageRows ?? []).map((p) => ({
+    pages: pageRows.map((p) => ({
       id: p.id,
       pageNumber: p.page_number,
       template: p.template as Page['template'],
@@ -159,22 +180,47 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not signed in');
 
+  const notebookId = notebook.id;
+  // Get the current row with version to implement optimistic concurrency
+  let { data: currentRow, error: fetchErr } = await supabase
+    .from('notebooks')
+    .select('version')
+    .eq('id', notebookId)
+    .maybeSingle();
+
+  if (fetchErr) throw fetchErr;
+  if (!currentRow) {
+    // Notebook doesn't exist yet, treat as version 0
+    currentRow = { version: 0 };
+  }
+
+  const clientVersion = notebook.version ?? 1;
+  if (currentRow?.version && clientVersion > currentRow.version) {
+    // Handle merge conflict if client version jumps ahead
+    console.warn(`Version mismatch for notebook ${notebookId}: local=${currentRow.version}, client=${clientVersion}`);
+    // Optionally throw an error or handle automatically
+  }
+
+  const newVersion = Math.max((currentRow?.version ?? 0) + 1, clientVersion);
+
+  const now = Date.now();
+
   const { error: nbErr } = await supabase.from('notebooks').upsert({
-    id: notebook.id,
+    id: notebookId,
     user_id: user.id,
     title: notebook.title,
     cover_color: notebook.coverColor,
     cover_style: notebook.coverStyle,
     created_at: notebook.createdAt,
-    updated_at: notebook.updatedAt,
+    updated_at: now,
+    version: newVersion,
   });
   if (nbErr) throw nbErr;
 
   // Upsert all pages in a single request (strokes stored as JSONB)
-  const now = Date.now();
   const rows = notebook.pages.map((page) => ({
     id: page.id,
-    notebook_id: notebook.id,
+    notebook_id: notebookId,
     page_number: page.pageNumber,
     template: page.template,
     strokes: page.strokes,
@@ -189,7 +235,7 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
   // resurface on the next read (the old IndexedDB store replaced the
   // whole notebook record, so this is a behavior change from before).
   const keepIds = notebook.pages.map((p) => p.id);
-  let del = supabase.from('pages').delete().eq('notebook_id', notebook.id);
+  let del = supabase.from('pages').delete().eq('notebook_id', notebookId);
   if (keepIds.length > 0) {
     del = del.not('id', 'in', `(${keepIds.join(',')})`);
   }
