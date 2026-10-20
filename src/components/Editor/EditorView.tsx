@@ -5,7 +5,7 @@ import {
 import {
   ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight
 } from 'lucide-react';
-import { Notebook, Page, Stroke, saveNotebook } from '../../storage/db';
+import { Notebook, Page, Stroke, saveNotebook } from '../../storage/cloud';
 import { useThemeMode } from '../../ThemeContext';
 
 interface EditorViewProps {

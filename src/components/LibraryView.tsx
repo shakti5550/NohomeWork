@@ -7,7 +7,7 @@ import {
 import {
   BookOpen, Plus, Trash2, Star, Folder, Search, LogOut, Menu, X, Sun, Moon
 } from 'lucide-react';
-import { Notebook, getAllNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook } from '../storage/db';
+import { Notebook, getAllNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook } from '../storage/cloud';
 import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
@@ -156,17 +156,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
       {/* Main Content Area */}
       <Box sx={{ flex: 1, p: { xs: 2, md: 4 }, overflowY: 'auto' }}>
         {/* Top Header */}
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', gap: 2, alignItems: { xs: 'flex-start', sm: 'center' }, mb: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', gap: 2, alignItems: { xs: 'stretch', sm: 'center' }, mb: 4, px: { xs: 0, sm: 0 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
             {isMobile && (
               <IconButton onClick={() => setIsSidebarOpen(true)} sx={{ mr: 1 }} color="inherit">
                 <Menu size={24} />
               </IconButton>
             )}
-            <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' } }}>Documents</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Documents</Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1.5, width: { xs: '100%', sm: 'auto' } }}>
             {/* Profile Dropdown - top right corner, above search bar */}
             <ProfileDropdown onSignOut={onSignOut} />
 

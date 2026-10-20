@@ -24,3 +24,7 @@ npm-debug.log*
 
 # Vercel
 .vercel
+
+# AI instructions
+CLAUDE.md
+claude.md

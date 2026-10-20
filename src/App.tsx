@@ -5,7 +5,7 @@ import {
 } from 'react-router-dom';
 import { LibraryView } from './components/LibraryView';
 import { EditorView } from './components/Editor/EditorView';
-import { Notebook, getNotebook } from './storage/db';
+import { Notebook, getNotebook } from './storage/cloud';
 import { AuthPage } from './components/Auth/AuthPage';
 import { CustomThemeProvider } from './ThemeContext';
 import { supabase } from './storage/supabaseClient';
@@ -61,12 +61,56 @@ const AppContent: React.FC = () => {
     <Routes>
       <Route path="/auth" element={<AuthPage onSuccess={handleSignInSuccess} />} />
       <Route path="/Home" element={
-        <LibraryView onOpenNotebook={(id) => navigate('/Editor/' + id)} onSignOut={handleSignOut} />
+        <AuthGuard>
+          <LibraryView onOpenNotebook={(id) => navigate('/Editor/' + id)} onSignOut={handleSignOut} />
+        </AuthGuard>
       } />
-      <Route path="/Editor/:id" element={<EditorRoute />} />
+      <Route path="/Editor/:id" element={
+        <AuthGuard>
+          <EditorRoute />
+        </AuthGuard>
+      } />
       <Route path="*" element={<Navigate to="/Home" replace />} />
     </Routes>
   );
+};
+
+// ─── Auth guard — redirects to /auth if the user is not signed in ───────
+const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
+  const [checking, setChecking] = useState(true);
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    const check = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setSignedIn(!!user);
+      setChecking(false);
+      if (!user) navigate('/auth', { replace: true });
+    };
+    check();
+
+    // Re-check when auth state changes (e.g. session restored on reload)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSignedIn(!!session?.user);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  if (checking) {
+    return (
+      <div style={{
+        width: '100vw', height: '100vh', display: 'flex',
+        justifyContent: 'center', alignItems: 'center',
+        background: '#0f172a', color: '#f8fafc', fontSize: '18px'
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
+  return signedIn ? <>{children}</> : null;
 };
 
 export const App: React.FC = () => {
