@@ -25,15 +25,17 @@ import {
   Checkbox,
 } from '@mui/material';
 import {
-  User, Edit, Lock, Calendar, LogOut, Eye, EyeOff, Save, X
+  User, Edit, Lock, Calendar, LogOut, Eye, EyeOff, Save, X, Sun, Moon
 } from 'lucide-react';
 import { supabase } from '../../storage/supabaseClient';
 
 interface ProfileDropdownProps {
   onSignOut: () => void;
+  mode?: 'light' | 'dark';
+  toggleTheme?: () => void;
 }
 
-export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut }) => {
+export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut, mode, toggleTheme }) => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -112,7 +114,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut }) =
         data: { full_name: editName.trim() }
       });
       if (error) throw error;
-      setUser(prev => prev ? { ...prev, user_metadata: { ...prev.user_metadata, full_name: editName.trim() } } : null);
+      setUser((prev: any) => prev ? { ...prev, user_metadata: { ...prev.user_metadata, full_name: editName.trim() } } : null);
       setSuccess('Name updated successfully!');
       setTimeout(() => setEditNameOpen(false), 1500);
     } catch (err: any) {
@@ -171,7 +173,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut }) =
         data: { dob: dob || undefined }
       });
       if (error) throw error;
-      setUser(prev => prev ? { ...prev, user_metadata: { ...prev.user_metadata, dob } } : null);
+      setUser((prev: any) => prev ? { ...prev, user_metadata: { ...prev.user_metadata, dob } } : null);
       setSuccess('Date of birth updated!');
       setTimeout(() => setEditDobOpen(false), 1500);
     } catch (err: any) {
@@ -228,6 +230,31 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut }) =
           {getInitials(displayName)}
         </Avatar>
       </IconButton>
+
+      {/* Theme toggle inside the profile dropdown menu */}
+      {toggleTheme && (
+        <IconButton
+          onClick={toggleTheme}
+          size="small"
+          color="inherit"
+          title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          sx={{
+            width: 36,
+            height: 36,
+            ml: 0.5,
+            '& .MuiAvatar-root': {
+              width: 32,
+              height: 32,
+              fontSize: '13px',
+              fontWeight: 600,
+            }
+          }}
+        >
+          <Avatar sx={{ bgcolor: 'background.paper', color: 'text.primary' }}>
+            {mode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </Avatar>
+        </IconButton>
+      )}
 
       {/* Profile Dropdown Menu */}
       <Menu
@@ -325,7 +352,9 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut }) =
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <User size={20} color="#94a3b8" sx={{ mr: 1 }} />
+                  <Box sx={{ mr: 1 }}>
+                    <User size={20} color="#94a3b8" />
+                  </Box>
                 </InputAdornment>
               )
             }}
@@ -449,7 +478,9 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut }) =
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Calendar size={20} color="#94a3b8" sx={{ mr: 1 }} />
+                  <Box sx={{ mr: 1 }}>
+                    <Calendar size={20} color="#94a3b8" />
+                  </Box>
                 </InputAdornment>
               )
             }}

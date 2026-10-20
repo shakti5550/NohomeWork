@@ -5,7 +5,7 @@ import {
   DialogActions, TextField, Card, Divider, Alert, useMediaQuery, useTheme
 } from '@mui/material';
 import {
-  BookOpen, Plus, Trash2, Star, Folder, Search, LogOut, Menu, X, Sun, Moon
+  BookOpen, Plus, Trash2, Star, Folder, Search, Menu, X
 } from 'lucide-react';
 import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook } from '../storage/cloud';
 import { AppLogo } from './AppLogo';
@@ -83,16 +83,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
     }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, px: 1 }}>
         <AppLogo size={32} />
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <IconButton onClick={toggleTheme} color="inherit">
-            {mode === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+        {isMobile && (
+          <IconButton onClick={() => setIsSidebarOpen(false)} size="small" color="inherit">
+            <X size={20} />
           </IconButton>
-          {isMobile && (
-            <IconButton onClick={() => setIsSidebarOpen(false)} size="small" color="inherit">
-              <X size={20} />
-            </IconButton>
-          )}
-        </Box>
+        )}
       </Box>
 
       <List sx={{ flexGrow: 1, gap: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
@@ -175,10 +170,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
           </Box>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1.5, width: { xs: '100%', sm: 'auto' } }}>
-            {/* Profile Dropdown - top right corner, above search bar */}
-            <ProfileDropdown onSignOut={onSignOut} />
-
-            {/* Search Bar */}
+            {/* Search Bar - above the profile icon */}
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
@@ -207,6 +199,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
                 }}
               />
             </Box>
+
+            {/* Profile Dropdown - top right corner, with theme toggle inside */}
+            <ProfileDropdown onSignOut={onSignOut} mode={mode} toggleTheme={toggleTheme} />
           </Box>
         </Box>
 
