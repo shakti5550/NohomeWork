@@ -9,3 +9,13 @@ body {
   background-color: #f8fafc;
   overflow: hidden;
 }
+
+/* Prevent iOS Safari from showing the "Copy/Translate" bubble when
+   touching the drawing canvas. Scoped to the editor canvas only so
+   other canvases (if any) keep their native touch behaviour. */
+canvas.nohome-editor-canvas {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}

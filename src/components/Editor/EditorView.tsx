@@ -478,6 +478,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         >
           <canvas
             ref={canvasRef}
+            className="nohome-editor-canvas"
             onPointerDown={startDrawing}
             onPointerMove={draw}
             onPointerUp={stopDrawing}
@@ -490,6 +491,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
               touchAction: 'none',
               userSelect: 'none',
               WebkitUserSelect: 'none',
+              WebkitTouchCallout: 'none',
             }}
           />
         </Box>

@@ -159,7 +159,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             {error}
           </Alert>
         )}
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', gap: 2, alignItems: { xs: 'stretch', sm: 'center' }, mb: 4, px: { xs: 0, sm: 0 } }}>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', gap: 2, alignItems: { xs: 'stretch', md: 'center' }, mb: 4, px: { xs: 0, md: 0 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
             {isMobile && (
               <IconButton onClick={() => setIsSidebarOpen(true)} sx={{ mr: 1 }} color="inherit">
@@ -169,8 +169,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Documents</Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1.5, width: { xs: '100%', sm: 'auto' } }}>
-            {/* Search Bar - above the profile icon */}
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'stretch', md: 'center' }, justifyContent: 'flex-end', gap: 1.5, width: { xs: '100%', md: 'auto' } }}>
+            {/* Search Bar - beside the profile icon on desktop, above on mobile */}
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
@@ -180,7 +180,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
               borderRadius: 3,
               border: '1px solid',
               borderColor: 'divider',
-              width: { xs: '100%', sm: 300 }
+              width: { xs: '100%', md: 300 }
             }}>
               <Search size={18} color="#94a3b8" />
               <input

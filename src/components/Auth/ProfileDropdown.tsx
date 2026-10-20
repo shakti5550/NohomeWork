@@ -16,16 +16,10 @@ import {
   InputAdornment,
   IconButton as MuiIconButton,
   Avatar,
-  Alert,
-  FormControl,
-  InputLabel,
-  Select,
-  NativeSelect,
-  FormControlLabel,
-  Checkbox,
+  Alert
 } from '@mui/material';
 import {
-  User, Edit, Lock, Calendar, LogOut, Eye, EyeOff, Save, X, Sun, Moon
+  User, Edit, Lock, Calendar, LogOut, Eye, EyeOff, Sun, Moon
 } from 'lucide-react';
 import { supabase } from '../../storage/supabaseClient';
 
@@ -231,31 +225,6 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut, mod
         </Avatar>
       </IconButton>
 
-      {/* Theme toggle inside the profile dropdown menu */}
-      {toggleTheme && (
-        <IconButton
-          onClick={toggleTheme}
-          size="small"
-          color="inherit"
-          title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          sx={{
-            width: 36,
-            height: 36,
-            ml: 0.5,
-            '& .MuiAvatar-root': {
-              width: 32,
-              height: 32,
-              fontSize: '13px',
-              fontWeight: 600,
-            }
-          }}
-        >
-          <Avatar sx={{ bgcolor: 'background.paper', color: 'text.primary' }}>
-            {mode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-          </Avatar>
-        </IconButton>
-      )}
-
       {/* Profile Dropdown Menu */}
       <Menu
         anchorEl={anchorEl}
@@ -291,6 +260,23 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut, mod
           </Box>
 
           <Divider sx={{ my: 0.5 }} />
+
+          {/* Theme Toggle - inside the profile box */}
+          {toggleTheme && (
+            <>
+              <MenuItem
+                onClick={() => { toggleTheme(); handleMenuClose(); }}
+                sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
+              >
+                {mode === 'dark' ? <Sun size={18} color="#64748b" /> : <Moon size={18} color="#64748b" />}
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {mode === 'dark' ? 'Switch to Light' : 'Switch to Dark'}
+                </Typography>
+              </MenuItem>
+
+              <Divider sx={{ my: 0.5 }} />
+            </>
+          )}
 
           {/* Menu Items */}
           <MenuItem
