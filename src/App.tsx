@@ -93,6 +93,7 @@ const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     // Re-check when auth state changes (e.g. session restored on reload)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSignedIn(!!session?.user);
+      if (!session?.user) navigate('/auth', { replace: true });
     });
 
     return () => subscription.unsubscribe();

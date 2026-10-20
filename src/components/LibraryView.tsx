@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   Typography, Button, IconButton, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, Card, Divider, useMediaQuery, useTheme, Switch
+  DialogActions, TextField, Card, Divider, Alert, useMediaQuery, useTheme
 } from '@mui/material';
 import {
   BookOpen, Plus, Trash2, Star, Folder, Search, LogOut, Menu, X, Sun, Moon
 } from 'lucide-react';
-import { Notebook, getAllNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook } from '../storage/cloud';
+import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook } from '../storage/cloud';
 import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
@@ -27,14 +27,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('Untitled Notebook');
   const [coverColor, setCoverColor] = useState('#1976d2');
+  const [error, setError] = useState<string | null>(null);
 
   const loadNotebooks = async () => {
-    const list = await getAllNotebooks();
-    if (list.length === 0) {
-      const defaultNb = await createDefaultNotebook('Welcome to NohomeWork');
-      setNotebooks([defaultNb]);
-    } else {
+    try {
+      const list = await loadCloudNotebooks();
       setNotebooks(list);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load notebooks');
     }
   };
 
@@ -156,6 +157,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
       {/* Main Content Area */}
       <Box sx={{ flex: 1, p: { xs: 2, md: 4 }, overflowY: 'auto' }}>
         {/* Top Header */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} action={
+            <Button size="small" onClick={loadNotebooks}>Retry</Button>
+          }>
+            {error}
+          </Alert>
+        )}
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', gap: 2, alignItems: { xs: 'stretch', sm: 'center' }, mb: 4, px: { xs: 0, sm: 0 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
             {isMobile && (

@@ -44,6 +44,28 @@ function ensureSignedIn() {
   }
 }
 
+// Guards the first-run seeding step so concurrent callers (e.g. React
+// StrictMode running the mount effect twice) can't both see an empty
+// list and each create a "Welcome" notebook.
+let loadPromise: Promise<Notebook[]> | null = null;
+
+export async function loadNotebooks(): Promise<Notebook[]> {
+  if (loadPromise) return loadPromise;
+  loadPromise = (async () => {
+    try {
+      const list = await getAllNotebooks();
+      if (list.length === 0) {
+        const defaultNb = await createDefaultNotebook('Welcome to NohomeWork');
+        return [defaultNb];
+      }
+      return list;
+    } finally {
+      loadPromise = null;
+    }
+  })();
+  return loadPromise;
+}
+
 // ─── Read ────────────────────────────────────────────────────────────────
 
 export async function getAllNotebooks(): Promise<Notebook[]> {
@@ -57,15 +79,17 @@ export async function getAllNotebooks(): Promise<Notebook[]> {
     .eq('user_id', user.id)
     .order('updated_at', { ascending: false });
 
-  if (nbErr || !nbRows || nbRows.length === 0) return [];
+  if (nbErr) throw nbErr;
+  if (!nbRows || nbRows.length === 0) return [];
 
   // Fetch every page for these notebooks in a single query
   const ids = nbRows.map((r) => r.id);
-  const { data: pageRows } = await supabase
+  const { data: pageRows, error: pgErr } = await supabase
     .from('pages')
     .select('*')
     .in('notebook_id', ids)
     .order('page_number', { ascending: true });
+  if (pgErr) throw pgErr;
 
   const pagesByNotebook = new Map<string, any[]>();
   for (const p of pageRows ?? []) {
@@ -95,20 +119,22 @@ export async function getNotebook(id: string): Promise<Notebook | undefined> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return undefined;
 
-  const { data: row, error } = await supabase
+  const { data: row, error: nbErr } = await supabase
     .from('notebooks')
     .select('*')
     .eq('id', id)
     .single();
 
-  if (error || !row) return undefined;
+  if (nbErr) throw nbErr;
+  if (!row) return undefined;
   if (row.user_id !== user.id) return undefined; // not ours
 
-  const { data: pageRows } = await supabase
+  const { data: pageRows, error: pgErr } = await supabase
     .from('pages')
     .select('*')
     .eq('notebook_id', id)
     .order('page_number', { ascending: true });
+  if (pgErr) throw pgErr;
 
   return {
     id: row.id,
@@ -144,18 +170,31 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
   });
   if (nbErr) throw nbErr;
 
-  // Upsert each page (strokes stored as JSONB)
-  for (const page of notebook.pages) {
-    const { error: pErr } = await supabase.from('pages').upsert({
-      id: page.id,
-      notebook_id: notebook.id,
-      page_number: page.pageNumber,
-      template: page.template,
-      strokes: page.strokes,
-      updated_at: Date.now(),
-    });
+  // Upsert all pages in a single request (strokes stored as JSONB)
+  const now = Date.now();
+  const rows = notebook.pages.map((page) => ({
+    id: page.id,
+    notebook_id: notebook.id,
+    page_number: page.pageNumber,
+    template: page.template,
+    strokes: page.strokes,
+    updated_at: now,
+  }));
+  if (rows.length > 0) {
+    const { error: pErr } = await supabase.from('pages').upsert(rows);
     if (pErr) throw pErr;
   }
+
+  // Remove pages that no longer exist locally so stale rows don't
+  // resurface on the next read (the old IndexedDB store replaced the
+  // whole notebook record, so this is a behavior change from before).
+  const keepIds = notebook.pages.map((p) => p.id);
+  let del = supabase.from('pages').delete().eq('notebook_id', notebook.id);
+  if (keepIds.length > 0) {
+    del = del.not('id', 'in', `(${keepIds.join(',')})`);
+  }
+  const { error: dErr } = await del;
+  if (dErr) throw dErr;
 }
 
 export async function deleteNotebook(id: string): Promise<void> {
