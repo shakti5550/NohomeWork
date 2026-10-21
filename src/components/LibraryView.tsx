@@ -160,7 +160,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
           </Alert>
         )}
         <Box sx={{ mb: 4 }}>
-          {/* Desktop: single row — title on the left, search + profile on the right, all aligned.
+          {/* Desktop: single row — title left, search bar middle, profile icon right.
               Mobile/tablet: two rows — title+profile on top, full-width search below. */}
           <Box sx={{
             display: 'flex',
@@ -169,48 +169,104 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             justifyContent: 'space-between',
             gap: { xs: 2, md: 0 }
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, flex: { xs: 1, md: 'auto' } }}>
+            {/* Left group: Title + Profile (mobile: same row, desktop: title only) */}
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              minWidth: 0,
+              flex: { xs: 1, md: 'auto' }
+            }}>
               {isMobile && (
                 <IconButton onClick={() => setIsSidebarOpen(true)} sx={{ mr: 1 }} color="inherit">
                   <Menu size={24} />
                 </IconButton>
               )}
               <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Documents</Typography>
+              {/* Profile icon: mobile-only, right-aligned with title */}
+              <Box sx={{
+                ml: 'auto',
+                display: { xs: 'flex', md: 'none' }
+              }}>
+                <ProfileDropdown onSignOut={onSignOut} mode={mode} toggleTheme={toggleTheme} />
+              </Box>
             </Box>
 
-            {/* Profile icon — opposite the title on mobile, beside search on desktop */}
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+            {/* Right group: Search + Profile (mobile: hidden, desktop: visible) */}
+            <Box sx={{
+              display: { xs: 'none', md: 'flex' },
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 1.5,
+              width: 'auto'
+            }}>
+              {/* Search bar */}
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                bgcolor: 'background.paper',
+                px: 2,
+                py: 0.5,
+                borderRadius: 3,
+                border: '1px solid',
+                borderColor: 'divider',
+                width: 300
+              }}>
+                <Search size={18} color="#94a3b8" />
+                <input
+                  type="text"
+                  placeholder="Search notebooks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    border: 'none',
+                    outline: 'none',
+                    padding: '8px',
+                    width: '100%',
+                    fontSize: '14px',
+                    background: 'transparent',
+                    color: mode === 'dark' ? '#f8fafc' : '#0f172a'
+                  }}
+                />
+              </Box>
+
+              {/* Profile icon - desktop only */}
               <ProfileDropdown onSignOut={onSignOut} mode={mode} toggleTheme={toggleTheme} />
             </Box>
 
-            {/* Search bar — full width on mobile, fixed width on desktop */}
+            {/* Mobile: full-width search bar below title */}
             <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              bgcolor: 'background.paper',
-              px: 2,
-              py: 0.5,
-              borderRadius: 3,
-              border: '1px solid',
-              borderColor: 'divider',
-              width: { xs: '100%', md: 300 }
+              display: { xs: 'flex', md: 'none' },
+              width: '100%'
             }}>
-              <Search size={18} color="#94a3b8" />
-              <input
-                type="text"
-                placeholder="Search notebooks..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  border: 'none',
-                  outline: 'none',
-                  padding: '8px',
-                  width: '100%',
-                  fontSize: '14px',
-                  background: 'transparent',
-                  color: mode === 'dark' ? '#f8fafc' : '#0f172a'
-                }}
-              />
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                bgcolor: 'background.paper',
+                px: 2,
+                py: 0.5,
+                borderRadius: 3,
+                border: '1px solid',
+                borderColor: 'divider',
+                width: '100%'
+              }}>
+                <Search size={18} color="#94a3b8" />
+                <input
+                  type="text"
+                  placeholder="Search notebooks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    border: 'none',
+                    outline: 'none',
+                    padding: '8px',
+                    width: '100%',
+                    fontSize: '14px',
+                    background: 'transparent',
+                    color: mode === 'dark' ? '#f8fafc' : '#0f172a'
+                  }}
+                />
+              </Box>
             </Box>
           </Box>
         </Box>
