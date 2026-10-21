@@ -6,9 +6,9 @@
 // serverless/function-edge-env injection — they never appear in the client
 // bundle.
 //
-// Each provider call has a 15s timeout so a stalled or slow provider fails
-// fast and the fallback chain can move to the next one, instead of hitting
-// Vercel's 30s hard limit and returning a 504.
+// Per-model timeout: 8s. Overall provider budget: 25s (hard deadline).
+// This ensures a dead provider (e.g. Kilo unreachable) can't exhaust
+// Vercel's function timeout — the chain moves on after ~25s max.
 //
 // Supported providers (fallback in order). Each provider tries its models
 // in order until one succeeds, then falls back to the next provider.
@@ -48,7 +48,9 @@ const PROVIDERS: ProviderConfig[] = [
   {
     name: 'kilo',
     // Kilo Gateway — OpenAI-compatible. xKiro tier gives 5M free tokens/day.
-    endpoint: 'https://gateway.kilo.ai/v1/chat/completions',
+    // Endpoint: api.kilo.ai/api/gateway (NOT gateway.kilo.ai — that domain
+    // doesn't exist).
+    endpoint: 'https://api.kilo.ai/api/gateway/chat/completions',
     headers: (key) => ({
       'Content-Type': 'application/json',
       Authorization: `Bearer ${key}`,
@@ -59,21 +61,13 @@ const PROVIDERS: ProviderConfig[] = [
     }),
     parseResponse: (json) => json?.choices?.[0]?.message?.content ?? '',
     // Auto-rotate: try each in order until one responds.
-    // IDs confirmed from Kilo Gateway docs (kilo/ prefix required).
+    // IDs confirmed from Kilo Gateway docs (bare vendor/model format).
+    // Kept short so a dead/unreachable provider fails fast instead of
+    // burning the whole Vercel timeout budget.
     models: [
-      'kilo/google/gemini-2.0-flash-001',
-      'kilo/nvidia/nemotron-3-super-120b-a12b',
-      'kilo/cohere/north-mini-code:free',
-      'kilo/dots-studio/dots-3-note-preview:free',
-      'kilo/kilo-auto/free',
-      'kilo/liquid/lfm-2.5-2.6b:free',
-      'kilo/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-      'kilo/nvidia/nemotron-3-ultra-550b-a55b',
-      'kilo/nvidia/nemotron-3.5-content-safety',
-      'kilo/nvidia/nemotron-3.5-lightning',
-      'kilo/openrouter/free',
-      'kilo/poolside/laguna-s-2.1:free',
-      'kilo/poolside/laguna-xs-2.1:free',
+      'google/gemini-2.0-flash-001',
+      'anthropic/claude-sonnet-4.6',
+      'openai/gpt-5.4-mini',
     ],
   },
   {
@@ -147,6 +141,11 @@ async function sendMessage(
     : PROVIDERS;
 
   const errors: string[] = [];
+
+  // Hard cap on total time spent trying providers. Without this, one dead
+  // provider with many models can exhaust Vercel's function timeout.
+  const deadline = Date.now() + 25_000;
+
   for (const provider of providers) {
     const key = KEYS[provider.name];
     if (!key) {
@@ -156,9 +155,15 @@ async function sendMessage(
 
     // Try each model for this provider until one succeeds.
     for (const model of provider.models) {
+      // Stop early if we're past the overall deadline.
+      if (Date.now() > deadline) {
+        errors.push('overall: deadline exceeded');
+        throw new Error('All AI providers failed: ' + errors.join(' | '));
+      }
+
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15_000);
+        const timeout = setTimeout(() => controller.abort(), 8_000);
 
         const url =
           typeof provider.endpoint === 'function'
