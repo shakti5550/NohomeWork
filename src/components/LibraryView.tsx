@@ -169,7 +169,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Documents</Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'stretch', md: 'center' }, justifyContent: 'flex-end', gap: 1.5, width: { xs: '100%', md: 'auto' } }}>
+          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'flex-end', md: 'center' }, justifyContent: 'flex-end', gap: 1.5, width: { xs: '100%', md: 'auto' } }}>
             {/* Search Bar - beside the profile icon on desktop, above on mobile */}
             <Box sx={{
               display: 'flex',
