@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS notebooks (
   created_at bigint NOT NULL,
   updated_at bigint NOT NULL,
   version bigint NOT NULL DEFAULT 1,
+  ai_chat jsonb DEFAULT '[]'::jsonb,
 );
 
 -- 2. Pages table (stores page data with strokes as JSONB)

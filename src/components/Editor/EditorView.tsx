@@ -1,11 +1,13 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-  Box, IconButton, Typography, Select, MenuItem, Slider, Tooltip, Divider, Button
+  Box, IconButton, Typography, Select, MenuItem, Slider, Tooltip, Divider, Button, Drawer, TextField
 } from '@mui/material';
 import {
-  ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight
+  ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight, Bot, X, Send
 } from 'lucide-react';
-import { Notebook, Page, Stroke, saveNotebook } from '../../storage/cloud';
+import { Notebook, Page, Stroke, saveNotebook, ChatMessage } from '../../storage/cloud';
+import { ChatButton } from '../AIChat/ChatButton';
+import { sendMessage } from '../../services/ai';
 import { useThemeMode } from '../../ThemeContext';
 
 interface EditorViewProps {
@@ -20,6 +22,13 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const [tool, setTool] = useState<'pen' | 'highlighter' | 'eraser'>('pen');
   const [color, setColor] = useState('#000000');
   const [width, setWidth] = useState(3);
+
+  // AI chat — floating button + right-side drawer.
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(notebook.aiChat ?? []);
+  const [chatInput, setChatInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
 
   // Drawing state lives in refs so pointer handlers never go stale and a
   // stroke commit does NOT trigger a React re-render (that was what made
@@ -68,6 +77,41 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       }
     };
   }, []);
+
+  // ─── AI chat ─────────────────────────────────────────────────────────────
+  // Sends a message to the best available provider (Gemini → OpenRouter →
+  // NVIDIA, with automatic fallback). The conversation is persisted on the
+  // notebook via the existing save flow so it syncs to the cloud.
+
+  const persistChat = useCallback((messages: ChatMessage[]) => {
+    const updated: Notebook = { ...notebookRef.current, aiChat: messages, updatedAt: Date.now() };
+    onUpdateNotebook(updated);
+    saveNotebook(updated);
+  }, [onUpdateNotebook]);
+
+  const handleSendMessage = useCallback(async () => {
+    const text = chatInput.trim();
+    if (!text || isSending) return;
+
+    const userMessage: ChatMessage = { role: 'user', content: text };
+    const nextMessages = [...chatMessages, userMessage];
+    setChatMessages(nextMessages);
+    setChatInput('');
+    setChatError(null);
+    setIsSending(true);
+
+    try {
+      const { response, provider } = await sendMessage(text, chatMessages);
+      const assistantMessage: ChatMessage = { role: 'assistant', content: response };
+      const withReply = [...nextMessages, assistantMessage];
+      setChatMessages(withReply);
+      persistChat(withReply);
+    } catch (err: any) {
+      setChatError(err.message || 'Something went wrong');
+    } finally {
+      setIsSending(false);
+    }
+  }, [chatInput, chatMessages, isSending, persistChat]);
 
   const drawTemplate = (ctx: CanvasRenderingContext2D, width: number, height: number, template: string) => {
     ctx.fillStyle = '#ffffff';
@@ -319,6 +363,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default', color: 'text.primary' }}>
+      {/* Floating AI chat button — bottom-right of the viewport */}
+      <ChatButton onClick={() => setChatOpen((o) => !o)} isOpen={chatOpen} />
+
       {/* Top Toolbar */}
       <Box sx={{
         display: 'flex',
@@ -496,6 +543,117 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           />
         </Box>
       </Box>
+
+      {/* AI chat drawer — slides in from the right over the canvas */}
+      <Drawer
+        anchor="right"
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        PaperProps={{
+          sx: {
+            width: '100%',
+            maxWidth: { xs: '100%', sm: 420 },
+            height: '100vh',
+            maxHeight: '100vh',
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+            borderLeft: '1px solid',
+            borderColor: 'divider',
+            display: 'flex',
+            flexDirection: 'column',
+          },
+        }}
+        slotProps={{ backdrop: { sx: { backdropFilter: 'blur(2px)' } } }}
+      >
+        {/* Drawer header */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+              <Bot size={18} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>AI Assistant</Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>Ask anything about your notes</Typography>
+            </Box>
+          </Box>
+          <Tooltip title="Close">
+            <IconButton size="small" onClick={() => setChatOpen(false)}>
+              <X size={18} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+
+        {/* Message list */}
+        <Box sx={{ flex: 1, overflowY: 'auto', p: 1.5, display: 'flex', flexDirection: 'column', gap: 1, bgcolor: 'background.default' }}>
+          {chatMessages.length === 0 && (
+            <Box sx={{ margin: 'auto', textAlign: 'center', color: 'text.secondary', p: 2 }}>
+              <Box sx={{ fontSize: 32, opacity: 0.5, mb: 1 }}>💬</Box>
+              <Typography variant="body2">Start a conversation</Typography>
+              <Typography variant="caption">Ask a question, request a summary, or get help with your notes.</Typography>
+            </Box>
+          )}
+          {chatMessages.map((msg, idx) => (
+            <Box
+              key={idx}
+              sx={{
+                maxWidth: '85%',
+                p: 1.2,
+                borderRadius: 2,
+                                bgcolor: msg.role === 'user' ? '#2563eb' : 'background.paper',
+                                color: msg.role === 'user' ? '#fff' : 'text.primary',
+                                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                                fontSize: '14px',
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {msg.content}
+                            </Box>
+          ))}
+          {isSending && (
+            <Box sx={{ maxWidth: '85%', p: 1.2, borderRadius: 2, bgcolor: 'background.paper', boxShadow: '0 1px 2px rgba(0,0,0,0.08)', color: 'text.secondary', fontSize: '14px' }}>
+              AI is thinking…
+            </Box>
+          )}
+          {chatError && (
+            <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', fontSize: '13px' }}>
+              {chatError}
+            </Box>
+          )}
+        </Box>
+
+        {/* Input row */}
+        <Box sx={{ p: 1.5, borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+          <TextField
+            multiline
+            maxRows={4}
+            size="small"
+            placeholder="Type a message…"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            sx={{ flex: 1, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            inputProps={{ 'aria-label': 'Chat message' }}
+          />
+          <Tooltip title="Send">
+            <IconButton
+              color="primary"
+              onClick={handleSendMessage}
+              disabled={!chatInput.trim() || isSending}
+              sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#2563eb', color: '#fff', '&:hover': { bgcolor: '#1d4ed8' }, '&.Mui-disabled': { bgcolor: 'action.disabled', color: '#fff' } }}
+            >
+              <Send size={18} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Drawer>
     </Box>
   );
 };

@@ -33,6 +33,12 @@ export interface Notebook {
   coverStyle: 'minimal' | 'classic' | 'grid';
   pages: Page[];
   version?: number;
+  aiChat?: ChatMessage[];
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 // ─── Cloud storage — Supabase is the single source of truth ─────────────
@@ -128,6 +134,8 @@ export async function getAllNotebooks(): Promise<Notebook[]> {
     updatedAt: row.updated_at,
     coverColor: row.cover_color,
     coverStyle: row.cover_style as Notebook['coverStyle'],
+    version: row.version,
+    aiChat: row.ai_chat ?? [],
     pages: (pagesByNotebook.get(row.id) ?? []).map((p) => ({
       id: p.id,
       pageNumber: p.page_number,
@@ -164,6 +172,8 @@ export async function getNotebook(id: string): Promise<Notebook | undefined> {
     updatedAt: row.updated_at,
     coverColor: row.cover_color,
     coverStyle: row.cover_style as Notebook['coverStyle'],
+    version: row.version,
+    aiChat: row.ai_chat ?? [],
     pages: pageRows.map((p) => ({
       id: p.id,
       pageNumber: p.page_number,
@@ -214,6 +224,7 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
     created_at: notebook.createdAt,
     updated_at: now,
     version: newVersion,
+    ai_chat: notebook.aiChat ?? [],
   });
   if (nbErr) throw nbErr;
 
