@@ -159,18 +159,24 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             {error}
           </Alert>
         )}
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', gap: 2, alignItems: { xs: 'stretch', md: 'center' }, mb: 4, px: { xs: 0, md: 0 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-            {isMobile && (
-              <IconButton onClick={() => setIsSidebarOpen(true)} sx={{ mr: 1 }} color="inherit">
-                <Menu size={24} />
-              </IconButton>
-            )}
-            <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Documents</Typography>
+        <Box sx={{ mb: 4 }}>
+          {/* Title row: hamburger + Documents on the left, profile avatar on the right */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+              {isMobile && (
+                <IconButton onClick={() => setIsSidebarOpen(true)} sx={{ mr: 1 }} color="inherit">
+                  <Menu size={24} />
+                </IconButton>
+              )}
+              <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Documents</Typography>
+            </Box>
+
+            {/* Profile Dropdown — sits opposite the title on mobile/tablet; inline with search on desktop */}
+            {isMobile && <ProfileDropdown onSignOut={onSignOut} mode={mode} toggleTheme={toggleTheme} />}
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'flex-end', md: 'center' }, justifyContent: 'flex-end', gap: 1.5, width: { xs: '100%', md: 'auto' } }}>
-            {/* Search Bar - beside the profile icon on desktop, above on mobile */}
+          {/* Second row: search bar (+ profile on desktop) */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5, mt: { xs: 2, md: 0 }, flexDirection: { xs: 'column', md: 'row' } }}>
             <Box sx={{
               display: 'flex',
               alignItems: 'center',
@@ -200,8 +206,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
               />
             </Box>
 
-            {/* Profile Dropdown - top right corner, with theme toggle inside */}
-            <ProfileDropdown onSignOut={onSignOut} mode={mode} toggleTheme={toggleTheme} />
+            {!isMobile && <ProfileDropdown onSignOut={onSignOut} mode={mode} toggleTheme={toggleTheme} />}
           </Box>
         </Box>
 

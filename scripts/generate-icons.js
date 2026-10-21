@@ -22,24 +22,10 @@ async function generate() {
 
   for (const { size, name } of SIZES) {
     const outPath = path.join(PUBLIC_DIR, name);
-    // Create a solid blue square first, then composite the SVG on top.
-    // This guarantees every pixel is blue — no transparent corners for
-    // iOS to render as a black border.
-    const blueBg = sharp({
-      create: {
-        width: size,
-        height: size,
-        channels: 4,
-        background: { r: 37, g: 99, b: 235, alpha: 255 },
-      },
-    }).png();
-
-    const svgBuffer = await sharp(SVG_PATH)
-      .resize(size, size, { fit: 'contain' })
-      .toBuffer();
-
-    await blueBg
-      .composite([{ input: svgBuffer }])
+    // Rasterize the full-bleed SVG directly to exact dimensions.
+    // The SVG has a full-width background, guaranteeing every pixel is filled.
+    await sharp(SVG_PATH)
+      .resize(size, size)
       .png({ quality: 100 })
       .toFile(outPath);
     console.log(`Generated ${outPath} (${size}x${size})`);

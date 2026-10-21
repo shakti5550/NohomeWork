@@ -1,27 +1,24 @@
 <svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="bg_grad" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
-      <stop stopColor="#2563EB" />
-      <stop offset="1" stopColor="#1D4ED8" />
+      <stop offset="0" stop-color="#2563EB" />
+      <stop offset="1" stop-color="#1D4ED8" />
     </linearGradient>
   </defs>
 
-  <!-- Blue Rounded Square filling the whole space -->
-  <rect width="128" height="128" rx="28" fill="url(#bg_grad)" />
+  <!-- Full-bleed vibrant blue background - no inner box, no borders -->
+  <rect width="128" height="128" fill="url(#bg_grad)" />
 
-  <!-- Inner Soft Sheet of Paper - Enlarged -->
-  <rect x="32" y="28" width="64" height="72" rx="12" fill="#3B82F6" fill-opacity="0.8" />
+  <!-- White document lines -->
+  <line x1="22" y1="36" x2="76" y2="36" stroke="white" stroke-width="7" stroke-linecap="round" stroke-opacity="0.95" />
+  <line x1="22" y1="56" x2="70" y2="56" stroke="white" stroke-width="7" stroke-linecap="round" stroke-opacity="0.95" />
+  <line x1="22" y1="76" x2="52" y2="76" stroke="white" stroke-width="7" stroke-linecap="round" stroke-opacity="0.95" />
 
-  <!-- Sheet Lines - Enlarged -->
-  <line x1="42" y1="46" x2="72" y2="46" stroke="white" stroke-width="4" stroke-linecap="round" stroke-opacity="0.95" />
-  <line x1="42" y1="58" x2="72" y2="58" stroke="white" stroke-width="4" stroke-linecap="round" stroke-opacity="0.95" />
-  <line x1="42" y1="70" x2="60" y2="70" stroke="white" stroke-width="4" stroke-linecap="round" stroke-opacity="0.95" />
-
-  <!-- Yellow Stylus / Folding 'N' Stroke - Enlarged to be prominent -->
+  <!-- Bold Yellow Stylus / Folding 'N' Stroke filling the icon -->
   <path
-    d="M48 94 L66 52 L88 40 L74 88"
+    d="M36 104 L68 46 L102 28 L82 96"
     stroke="#FBBF24"
-    stroke-width="10"
+    stroke-width="15"
     stroke-linecap="round"
     stroke-linejoin="round"
   />
