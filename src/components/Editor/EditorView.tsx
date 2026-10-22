@@ -55,26 +55,20 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   useEffect(() => {
     const el = canvasAreaRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => {
-      const r = el.getBoundingClientRect();
-      setCanvasAreaSize({ width: r.width, height: r.height });
-    });
-    ro.observe(el);
-    const r = el.getBoundingClientRect();
-    setCanvasAreaSize({ width: r.width, height: r.height });
-    return () => ro.disconnect();
-  }, []);
-
-  // Canvas-area padding (matches the `p` prop: xs=0.5rem, sm=1rem, md=4rem).
-  // Used to subtract horizontal padding from the available width so the
-  // derived width keeps the page ratio intact.
-  const [padL, setPadL] = useState(0);
-  useEffect(() => {
-    const el = canvasAreaRef.current;
-    if (!el) return;
     const measure = () => {
+      const r = el.getBoundingClientRect();
       const cs = getComputedStyle(el);
-      setPadL(parseFloat(cs.paddingLeft) || 0);
+      const padH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      const padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      const availW = r.width - padH;
+      const availH = r.height - padV;
+      setCanvasAreaSize({ width: availW, height: availH });
+      console.log('[Editor] canvas avail w:', Math.round(availW), 'h:', Math.round(availH),
+        'padH:', Math.round(padH), 'padV:', Math.round(padV),
+        'viewport w:', Math.round(window.innerWidth), 'h:', Math.round(window.innerHeight));
+      console.log('[Editor] canvas avail w:', Math.round(availW), 'h:', Math.round(availH),
+        'padH:', Math.round(padH), 'padV:', Math.round(padV),
+        'viewport w:', Math.round(window.innerWidth), 'h:', Math.round(window.innerHeight));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -82,9 +76,10 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     return () => ro.disconnect();
   }, []);
 
-  // Available height/width inside the canvas area (after its padding).
-  const availHeight = canvasAreaSize.height - 2 * padL;
-  const availWidth = canvasAreaSize.width - 2 * padL;
+  // Available height/width inside the canvas area (after padding).
+  // Note: canvasAreaSize already has padding subtracted, so availHeight/Width are the true free space.
+  const availHeight = canvasAreaSize.height;
+  const availWidth = Math.max(0, canvasAreaSize.width);
 
   // In landscape, cap the page against the available height and derive the
   // width from that cap so the 5/4 ratio is preserved. (CSS aspect-ratio
@@ -94,6 +89,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const pageMaxWidth = isLandscape && pageMaxHeight > 0
     ? Math.min(availWidth, pageMaxHeight * (5 / 4))
     : 0;
+  console.log('[Editor] isLandscape:', isLandscape, 'pageMaxHeight:', pageMaxHeight, 'pageMaxWidth:', pageMaxWidth, 'availHeight:', availHeight, 'availWidth:', availWidth);
 
   // Latest values for use inside long-lived callbacks / timers.
   const notebookRef = useRef(notebook);
