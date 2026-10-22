@@ -1,9 +1,11 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-  Box, IconButton, Typography, Select, MenuItem, Slider, Tooltip, Divider, Button, Drawer, TextField, useMediaQuery
+  Box, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, Typography, Slider, Drawer, TextField, useMediaQuery
 } from '@mui/material';
 import {
-  ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight, Bot, X, Send
+  ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight,
+  Bot, X, Send, Pencil
 } from 'lucide-react';
 import { Notebook, Page, Stroke, TextAnnotation, saveNotebook, ChatMessage } from '../../storage/cloud';
 import { ChatButton } from '../AIChat/ChatButton';
@@ -17,40 +19,52 @@ interface EditorViewProps {
   onUpdateNotebook: (updated: Notebook) => void;
 }
 
+type Tool = 'pen' | 'highlighter' | 'eraser';
+type Template = 'blank' | 'ruled' | 'grid' | 'dotted';
+
+// Predefined colors for the palette
+const PRESET_COLORS = ['#000000', '#dc2626', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
+
 export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpdateNotebook }) => {
   const { mode } = useThemeMode();
   const isLandscape = useMediaQuery('(orientation: landscape)');
+
+  // Drawing state
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [tool, setTool] = useState<'pen' | 'highlighter' | 'eraser'>('pen');
+  const [tool, setTool] = useState<Tool>('pen');
   const [color, setColor] = useState('#000000');
   const [width, setWidth] = useState(3);
+  const [template, setTemplate] = useState<Template>('ruled');
 
-  // Track the last pointer position so dictation knows where to place text.
+  // UI state
+  const [toolDialogOpen, setToolDialogOpen] = useState(false);
+  const [paginationVisible, setPaginationVisible] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // Pagination state
+  const paginationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const paginationRef = useRef<HTMLDivElement | null>(null);
+
+  // Track pointer position for dictation
   const [lastPointerPos, setLastPointerPos] = useState<{ x: number; y: number } | null>(null);
 
-  // AI chat — floating button + right-side drawer.
-  const [chatOpen, setChatOpen] = useState(false);
+  // AI chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(notebook.aiChat ?? []);
   const [chatInput, setChatInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
 
-  // Drawing state lives in refs so pointer handlers never go stale and a
-  // stroke commit does NOT trigger a React re-render (that was what made
-  // fast writing drop strokes — every lift caused a full redraw + IndexedDB
-  // write that blocked the next touch-down).
+  // Drawing refs
   const isDrawingRef = useRef(false);
   const currentStrokeRef = useRef<Stroke | null>(null);
   const activePointerIdRef = useRef<number | null>(null);
-
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasAreaRef = useRef<HTMLDivElement | null>(null);
+
   const currentPage: Page = notebook.pages[currentPageIndex] || notebook.pages[0];
 
-  // Measure the canvas area's *real* available size (after the toolbar
-  // shrinks the viewport) so the page cap is anchored to what actually fits
-  // rather than the full window height — otherwise the bottom of the page
-  // would be clipped and unreachable.
+  // Canvas area measurement
   const [canvasAreaSize, setCanvasAreaSize] = useState({ width: 0, height: 0 });
   useEffect(() => {
     const el = canvasAreaRef.current;
@@ -63,9 +77,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       const availW = r.width - padH;
       const availH = r.height - padV;
       setCanvasAreaSize({ width: availW, height: availH });
-      console.log('[Editor] canvas avail w:', Math.round(availW), 'h:', Math.round(availH),
-        'padH:', Math.round(padH), 'padV:', Math.round(padV),
-        'viewport w:', Math.round(window.innerWidth), 'h:', Math.round(window.innerHeight));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -73,38 +84,24 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     return () => ro.disconnect();
   }, []);
 
-  // Available height/width inside the canvas area (after padding).
-  // Note: canvasAreaSize already has padding subtracted, so availHeight/Width are the true free space.
   const availHeight = canvasAreaSize.height;
   const availWidth = Math.max(0, canvasAreaSize.width);
 
-  // In landscape, use a wider aspect ratio so the page fills more of the
-  // available width on wide laptop screens, while keeping a reasonable page
-  // shape. Clamped between 5/4 (1.25) and 8/5 (1.6) — narrower than the
-  // available space would let it grow, so the page never becomes a strip.
   const landscapeRatioNum = isLandscape
     ? Math.max(1.25, Math.min(availWidth / Math.max(1, availHeight), 1.6))
     : 1.25;
-  const landscapeAspectRatio = isLandscape ? `${landscapeRatioNum} / 1` : '4 / 5';
-
-  // In landscape, cap the page against the available height and derive the
-  // width from that cap so the ratio is preserved. (CSS aspect-ratio only
-  // supplies a preferred size — it does not override a conflicting
-  // maxHeight, which would otherwise squash the page off-ratio.)
   const pageMaxHeight = isLandscape ? Math.max(0, availHeight) : 0;
   const pageMaxWidth = isLandscape && pageMaxHeight > 0
     ? Math.min(availWidth, pageMaxHeight * landscapeRatioNum)
     : 0;
 
-  // Latest values for use inside long-lived callbacks / timers.
+  // Notebook ref for callbacks
   const notebookRef = useRef(notebook);
   notebookRef.current = notebook;
   const pageIndexRef = useRef(currentPageIndex);
   pageIndexRef.current = currentPageIndex;
-  const saveTimerRef = useRef<number | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Commit page changes to React state immediately (cheap) but debounce the
-  // IndexedDB write so rapid strokes don't queue up dozens of saves/redraws.
   const updateCurrentNotebook = useCallback((newPages: Page[], persistDelay = 400) => {
     const updated: Notebook = {
       ...notebookRef.current,
@@ -112,70 +109,117 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       updatedAt: Date.now()
     };
     onUpdateNotebook(updated);
-
-    if (saveTimerRef.current !== null) {
-      window.clearTimeout(saveTimerRef.current);
-    }
-    saveTimerRef.current = window.setTimeout(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
       saveNotebook(updated);
     }, persistDelay);
   }, [onUpdateNotebook]);
 
-  // Flush any pending save when leaving the editor.
   useEffect(() => {
     return () => {
-      if (saveTimerRef.current !== null) {
-        window.clearTimeout(saveTimerRef.current);
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
         saveTimerRef.current = null;
         saveNotebook(notebookRef.current);
       }
     };
   }, []);
 
-  // ─── AI chat ─────────────────────────────────────────────────────────────
-  // Sends a message to the best available provider (Gemini → OpenRouter →
-  // NVIDIA, with automatic fallback). The conversation is persisted on the
-  // notebook via the existing save flow so it syncs to the cloud.
+  // ─── Pagination controls ──────────────────────────────────────────────────
+  const showPagination = useCallback(() => {
+    setPaginationVisible(true);
+    if (paginationTimeoutRef.current) clearTimeout(paginationTimeoutRef.current);
+    paginationTimeoutRef.current = setTimeout(() => {
+      setPaginationVisible(false);
+    }, 3000);
+  }, []);
 
-  const persistChat = useCallback((messages: ChatMessage[]) => {
-    const updated: Notebook = { ...notebookRef.current, aiChat: messages, updatedAt: Date.now() };
-    onUpdateNotebook(updated);
-    saveNotebook(updated);
-  }, [onUpdateNotebook]);
-
-  const handleSendMessage = useCallback(async () => {
-    const text = chatInput.trim();
-    if (!text || isSending) return;
-
-    const userMessage: ChatMessage = { role: 'user', content: text };
-    const nextMessages = [...chatMessages, userMessage];
-    setChatMessages(nextMessages);
-    setChatInput('');
-    setChatError(null);
-    setIsSending(true);
-
-    try {
-      const { response, provider } = await sendMessage(text, chatMessages);
-      const assistantMessage: ChatMessage = { role: 'assistant', content: response };
-      const withReply = [...nextMessages, assistantMessage];
-      setChatMessages(withReply);
-      persistChat(withReply);
-    } catch (err: any) {
-      setChatError(err.message || 'Something went wrong');
-    } finally {
-      setIsSending(false);
+  const goToPrevPage = useCallback(() => {
+    if (currentPageIndex > 0) {
+      setCurrentPageIndex(currentPageIndex - 1);
+      showPagination();
     }
-  }, [chatInput, chatMessages, isSending, persistChat]);
+  }, [currentPageIndex, showPagination]);
 
-  const drawTemplate = (ctx: CanvasRenderingContext2D, width: number, height: number, template: string) => {
+  const goToNextPage = useCallback(() => {
+    if (currentPageIndex < notebook.pages.length - 1) {
+      setCurrentPageIndex(currentPageIndex + 1);
+      showPagination();
+    }
+  }, [currentPageIndex, notebook.pages.length, showPagination]);
+
+  // Touch/swipe handling
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        time: Date.now()
+      };
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!touchStartRef.current) return;
+      const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+      const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
+      const dt = Date.now() - touchStartRef.current.time;
+
+      // Only trigger on horizontal swipes faster than 200ms
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 2 && dt < 500) {
+        if (dx < 0) goToNextPage();
+        else goToPrevPage();
+      }
+      touchStartRef.current = null;
+    };
+
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchend', handleTouchEnd);
+      if (paginationTimeoutRef.current) clearTimeout(paginationTimeoutRef.current);
+    };
+  }, [goToNextPage, goToPrevPage]);
+
+  // ─── Page operations ──────────────────────────────────────────────────────
+  const handleAddPage = () => {
+    const newPage: Page = {
+      id: 'pg_' + Math.random().toString(36).substring(2, 9),
+      pageNumber: notebook.pages.length + 1,
+      template,
+      strokes: []
+    };
+    const updatedPages = [...notebook.pages, newPage];
+    updateCurrentNotebook(updatedPages, 0);
+    setCurrentPageIndex(updatedPages.length - 1);
+  };
+
+  const handleDeletePage = () => {
+    if (notebook.pages.length <= 1) {
+      alert('A notebook must have at least one page.');
+      return;
+    }
+    const updatedPages = notebook.pages.filter((_, idx) => idx !== currentPageIndex);
+    updateCurrentNotebook(updatedPages, 0);
+    setCurrentPageIndex(Math.max(0, currentPageIndex - 1));
+  };
+
+  const handleChangeTemplate = (t: Template) => {
+    const updatedPages = [...notebook.pages];
+    updatedPages[currentPageIndex] = { ...currentPage, template: t };
+    updateCurrentNotebook(updatedPages, 0);
+    setTemplate(t);
+  };
+
+  // ─── Canvas drawing ───────────────────────────────────────────────────────
+  const drawTemplate = (ctx: CanvasRenderingContext2D, width: number, height: number, tpl: string) => {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
-
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
 
-    if (template === 'ruled') {
+    if (tpl === 'ruled') {
       const lineHeight = 32;
       for (let y = 60; y < height; y += lineHeight) {
         ctx.beginPath();
@@ -183,13 +227,12 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         ctx.lineTo(width - 40, y);
         ctx.stroke();
       }
-      // Margin line
       ctx.strokeStyle = '#fca5a5';
       ctx.beginPath();
       ctx.moveTo(80, 0);
       ctx.lineTo(80, height);
       ctx.stroke();
-    } else if (template === 'grid') {
+    } else if (tpl === 'grid') {
       const gridSize = 32;
       for (let x = 0; x < width; x += gridSize) {
         ctx.beginPath();
@@ -203,7 +246,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         ctx.lineTo(width, y);
         ctx.stroke();
       }
-    } else if (template === 'dotted') {
+    } else if (tpl === 'dotted') {
       const dotSize = 32;
       ctx.fillStyle = '#cbd5e1';
       for (let x = 32; x < width; x += dotSize) {
@@ -220,7 +263,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     if (maxWidth <= 0) return [];
     ctx.font = `${fontSize}px ${font}`;
     const lines: string[] = [];
-    // Preserve explicit line breaks from the transcript.
     for (const paragraph of text.split('\n')) {
       if (paragraph.length === 0) {
         lines.push('');
@@ -238,7 +280,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           line = testLine;
         }
       }
-      // A single word wider than the max width: fall back to char breaking.
       if (line.length > 0 && ctx.measureText(line).width > maxWidth) {
         let chunk = '';
         for (const ch of line) {
@@ -263,29 +304,24 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     ctx.save();
     ctx.textBaseline = 'top';
 
+    // Clamp x to stay within canvas bounds (left margin + right margin)
+    const leftMargin = 8;
     const rightMargin = 24;
-    const maxWidth = canvasWidth - ann.x - rightMargin;
+    const clampedX = Math.max(leftMargin, Math.min(ann.x, canvasWidth - rightMargin - 1));
+    const maxWidth = canvasWidth - clampedX - rightMargin;
+
     if (maxWidth <= 0 || canvasHeight <= 0) {
       ctx.restore();
       return;
     }
-
-    // Three strategies, tried in order, so a tall block is never silently
-    // clipped off the bottom of the page:
-    //   1. Render at the requested size if the whole block fits.
-    //   2. Shift the block up within the page if it still fits vertically.
-    //   3. Shrink the font until the block fits (down to a floor) — this is
-    //      the only way to show a block taller than the canvas itself.
     const MIN_FONT = 10;
     const LINE_HEIGHT_RATIO = 1.4;
-
     let fontSize = ann.fontSize;
     let lines = wrapText(ctx, ann.text, maxWidth, fontSize, ann.font);
     let lineHeight = fontSize * LINE_HEIGHT_RATIO;
     let blockHeight = lines.length * lineHeight;
 
     if (blockHeight > canvasHeight) {
-      // Block is taller than the page — scale the font down until it fits.
       for (let attempt = 0; attempt < 30; attempt++) {
         const needed = canvasHeight / blockHeight;
         fontSize = Math.max(MIN_FONT, fontSize * Math.min(1, needed));
@@ -297,8 +333,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       }
     }
 
-    // Vertically fit the block inside the page: prefer the original y, but
-    // slide it up if it would run off the bottom.
     let startY = ann.y;
     if (startY + blockHeight > canvasHeight) {
       startY = Math.max(0, canvasHeight - blockHeight - 8);
@@ -306,7 +340,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
     ctx.font = `${fontSize}px ${ann.font}`;
     ctx.fillStyle = ann.color;
-    lines.forEach((line, i) => ctx.fillText(line, ann.x, startY + i * lineHeight));
+    lines.forEach((line, i) => ctx.fillText(line, clampedX, startY + i * lineHeight));
     ctx.restore();
   };
 
@@ -330,20 +364,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     ctx.restore();
   };
 
-  // Size the backing store once per resize; only repaint strokes when the
-  // committed page data changes — never while a stroke is in progress, so
-  // the live ink isn't wiped mid-motion and the main thread stays free for
-  // incoming pointer events.
-  //
-  // `canvasAreaHeight`/`isLandscape` are in the deps so a measured height
-  // change (page resize) re-sizes the backing store. A CSS-sized canvas
-  // otherwise scales its existing buffer instead of resizing it, which
-  // misaligns existing ink and offsets a live stroke from the pointer.
   useEffect(() => {
-    // Bail out before touching the bitmap while a stroke is in flight —
-    // resizing/clearing now would wipe the live ink mid-motion.
     if (isDrawingRef.current) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -361,20 +383,18 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, rect.width, rect.height);
-    drawTemplate(ctx, rect.width, rect.height, currentPage.template);
+    drawTemplate(ctx, rect.width, rect.height, template);
 
     currentPage.strokes.forEach((stroke) => drawStroke(ctx, stroke));
     (currentPage.textAnnotations ?? []).forEach((ann) => drawTextAnnotation(ctx, ann, rect.width, rect.height));
-  }, [currentPage, pageMaxHeight, pageMaxWidth, isLandscape]);
+  }, [currentPage, pageMaxHeight, pageMaxWidth, isLandscape, template]);
 
   const stopDrawing = () => {
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
     isDrawingRef.current = false;
     activePointerIdRef.current = null;
-
     const stroke = currentStrokeRef.current;
     currentStrokeRef.current = null;
-
     const nb = notebookRef.current;
     const idx = pageIndexRef.current;
     const page = nb.pages[idx];
@@ -386,17 +406,11 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    // A stray pointerdown while a stroke is somehow still open: close it first.
     if (isDrawingRef.current) stopDrawing();
-
     e.preventDefault();
     try {
       canvas.setPointerCapture(e.pointerId);
-    } catch {
-      // Pointer capture may fail in some browsers; drawing still works.
-    }
-
+    } catch {}
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -409,7 +423,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
     activePointerIdRef.current = e.pointerId;
     isDrawingRef.current = true;
-    const newStroke: Stroke = {
+    currentStrokeRef.current = {
       id: 'st_' + Math.random().toString(36).substring(2, 9),
       tool,
       color,
@@ -417,31 +431,23 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       opacity: tool === 'highlighter' ? 0.4 : 1.0,
       points: [{ x, y }]
     };
-    currentStrokeRef.current = newStroke;
   };
 
   const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
     e.preventDefault();
-
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     setLastPointerPos({ x, y });
-
     const stroke = currentStrokeRef.current;
     const lastPt = stroke.points[stroke.points.length - 1];
     stroke.points.push({ x, y });
-
-    // Incremental render: draw only the newest segment onto the existing
-    // bitmap. No clearing, no re-render, no React state update.
     ctx.save();
     ctx.beginPath();
     ctx.strokeStyle = stroke.color;
@@ -461,8 +467,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     stopDrawing();
   }, []);
 
-  // Catch lifts/cancels anywhere on the page (finger drifting off-canvas,
-  // palm rejection, system gestures) so drawing state always resets cleanly.
   useEffect(() => {
     window.addEventListener('pointerup', handleWindowPointerEnd);
     window.addEventListener('pointercancel', handleWindowPointerEnd);
@@ -473,18 +477,13 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   }, [handleWindowPointerEnd]);
 
   const eraseStrokeAt = (x: number, y: number) => {
-    // Simple radius eraser
     const radius = 15;
     const filteredStrokes = currentPage.strokes.filter((stroke) => {
       return !stroke.points.some((pt) => Math.hypot(pt.x - x, pt.y - y) < radius);
     });
-
     if (filteredStrokes.length !== currentPage.strokes.length) {
       const updatedPages = [...notebook.pages];
-      updatedPages[currentPageIndex] = {
-        ...currentPage,
-        strokes: filteredStrokes
-      };
+      updatedPages[currentPageIndex] = { ...currentPage, strokes: filteredStrokes };
       updateCurrentNotebook(updatedPages);
     }
   };
@@ -495,7 +494,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       x, y,
       text,
       font: 'system-ui',
-      fontSize: width * 5 + 8, // scale font with brush size (8–68px)
+      fontSize: width * 5 + 8,
       color,
       createdAt: Date.now(),
     };
@@ -503,193 +502,139 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     const idx = pageIndexRef.current;
     const page = nb.pages[idx];
     const updatedPages = [...nb.pages];
-    updatedPages[idx] = {
-      ...page,
-      textAnnotations: [...(page.textAnnotations ?? []), ann],
-    };
+    updatedPages[idx] = { ...page, textAnnotations: [...(page.textAnnotations ?? []), ann] };
     updateCurrentNotebook(updatedPages);
   };
 
-  const handleAddPage = () => {
-    const newPage: Page = {
-      id: 'pg_' + Math.random().toString(36).substring(2, 9),
-      pageNumber: notebook.pages.length + 1,
-      template: currentPage.template,
-      strokes: []
-    };
-    const updatedPages = [...notebook.pages, newPage];
-    updateCurrentNotebook(updatedPages, 0);
-    setCurrentPageIndex(updatedPages.length - 1);
-  };
+  // ─── AI chat ──────────────────────────────────────────────────────────────
+  const persistChat = useCallback((messages: ChatMessage[]) => {
+    const updated: Notebook = { ...notebookRef.current, aiChat: messages, updatedAt: Date.now() };
+    onUpdateNotebook(updated);
+    saveNotebook(updated);
+  }, [onUpdateNotebook]);
 
-  const handleDeletePage = () => {
-    if (notebook.pages.length <= 1) {
-      alert('A notebook must have at least one page.');
-      return;
+  const handleSendMessage = useCallback(async () => {
+    const text = chatInput.trim();
+    if (!text || isSending) return;
+    const userMessage: ChatMessage = { role: 'user', content: text };
+    const nextMessages = [...chatMessages, userMessage];
+    setChatMessages(nextMessages);
+    setChatInput('');
+    setChatError(null);
+    setIsSending(true);
+    try {
+      const { response } = await sendMessage(text, chatMessages);
+      const assistantMessage: ChatMessage = { role: 'assistant', content: response };
+      const withReply = [...nextMessages, assistantMessage];
+      setChatMessages(withReply);
+      persistChat(withReply);
+    } catch (err: any) {
+      setChatError(err.message || 'Something went wrong');
+    } finally {
+      setIsSending(false);
     }
-    const updatedPages = notebook.pages.filter((_, idx) => idx !== currentPageIndex);
-    updateCurrentNotebook(updatedPages, 0);
-    setCurrentPageIndex(Math.max(0, currentPageIndex - 1));
-  };
+  }, [chatInput, chatMessages, isSending, persistChat]);
 
-  const handleTemplateChange = (template: any) => {
-    const updatedPages = [...notebook.pages];
-    updatedPages[currentPageIndex] = {
-      ...currentPage,
-      template
-    };
-    updateCurrentNotebook(updatedPages, 0);
-  };
+  // ─── Render ───────────────────────────────────────────────────────────────
+  const FloatingBtn = ({ onClick, icon, tooltip, style }: { onClick: () => void; icon: React.ReactNode; tooltip: string; style?: React.CSSProperties }) => (
+    <Tooltip title={tooltip} placement="top">
+      <IconButton
+        onClick={onClick}
+        sx={{
+          position: 'fixed',
+          width: 48,
+          height: 48,
+          borderRadius: '50%',
+          bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.1)' : '#ffffff',
+          color: mode === 'dark' ? '#f8fafc' : '#1e293b',
+          border: '1px solid',
+          borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 100,
+          transition: 'all 0.2s ease',
+          '&:hover': { transform: 'scale(1.1)', boxShadow: '0 6px 16px rgba(0,0,0,0.2)' },
+          ...style
+        }}
+      >
+        {icon}
+      </IconButton>
+    </Tooltip>
+  );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default', color: 'text.primary' }}>
-      {/* Floating dictation button — bottom-right, just above the AI chat button */}
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
+      {/* Back Button — top-left */}
+      <FloatingBtn
+        onClick={onBack}
+        tooltip="Back to Library"
+        icon={<ArrowLeft size={20} />}
+        style={{ top: 16, left: 16 }}
+      />
+
+      {/* Tool Button — below back button */}
+      <FloatingBtn
+        onClick={() => setToolDialogOpen(true)}
+        tooltip="Tools & Settings"
+        icon={<Pencil size={20} />}
+        style={{ top: 76, left: 16 }}
+      />
+
+      {/* Add Page Button — above mic button */}
+      <FloatingBtn
+        onClick={handleAddPage}
+        tooltip="Add Page"
+        icon={<Plus size={20} />}
+        style={{ bottom: 140, right: 16 }}
+      />
+
+      {/* Delete Page Button — below AI chat button */}
+      <FloatingBtn
+        onClick={handleDeletePage}
+        tooltip="Delete Page"
+        icon={<Trash2 size={20} />}
+        style={{ bottom: 16, right: 16, color: '#ef4444', borderColor: '#fecaca' }}
+      />
+
+      {/* Floating dictation button */}
       <DictationButton onDictate={handleDictate} lastPointerPos={lastPointerPos} />
 
-      {/* Floating AI chat button — bottom-right of the viewport */}
+      {/* Floating AI chat button */}
       <ChatButton onClick={() => setChatOpen((o) => !o)} isOpen={chatOpen} />
 
-      {/* Top Toolbar */}
-      <Box sx={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'center',
-        px: { xs: 1, md: 2 },
-        py: 1,
-        bgcolor: 'background.paper',
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-        gap: { xs: 1, md: 2 },
-        zIndex: 10,
-      }}>
-        <Tooltip title="Back to Library">
-          <IconButton onClick={onBack} color="inherit" size="small">
-            <ArrowLeft size={20} />
-          </IconButton>
-        </Tooltip>
-
-        <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '15px', color: 'text.primary', whiteSpace: 'nowrap' }}>
-          {notebook.title}
-        </Typography>
-
-        <Divider orientation="vertical" flexItem sx={{ my: 0.5, display: { xs: 'none', sm: 'block' } }} />
-
-        {/* Tools */}
-        <Box sx={{ display: 'flex', gap: 0.5, bgcolor: 'action.hover', p: 0.5, borderRadius: 2 }}>
-          <Tooltip title="Pen">
-            <IconButton
-              size="small"
-              onClick={() => setTool('pen')}
-              sx={{ borderRadius: 1.5, bgcolor: tool === 'pen' ? 'background.paper' : 'transparent', color: tool === 'pen' ? '#2563eb' : 'text.secondary', boxShadow: tool === 'pen' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-            >
-              <PenTool size={18} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Highlighter">
-            <IconButton
-              size="small"
-              onClick={() => setTool('highlighter')}
-              sx={{ borderRadius: 1.5, bgcolor: tool === 'highlighter' ? 'background.paper' : 'transparent', color: tool === 'highlighter' ? '#2563eb' : 'text.secondary', boxShadow: tool === 'highlighter' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-            >
-              <Highlighter size={18} />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Eraser">
-            <IconButton
-              size="small"
-              onClick={() => setTool('eraser')}
-              sx={{ borderRadius: 1.5, bgcolor: tool === 'eraser' ? 'background.paper' : 'transparent', color: tool === 'eraser' ? '#2563eb' : 'text.secondary', boxShadow: tool === 'eraser' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
-            >
-              <Eraser size={18} />
-            </IconButton>
-          </Tooltip>
-        </Box>
-
-        {/* Colors */}
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          {['#000000', '#dc2626', '#2563eb', '#16a34a', '#d97706'].map((c) => (
-            <Box
-              key={c}
-              onClick={() => setColor(c)}
-              sx={{
-                width: 20,
-                height: 20,
-                borderRadius: '50%',
-                bgcolor: c,
-                cursor: 'pointer',
-                border: color === c ? '2px solid #0f172a' : '2px solid transparent',
-                transform: color === c ? 'scale(1.15)' : 'scale(1)',
-                transition: 'all 0.1s'
-              }}
-            />
-          ))}
-        </Box>
-
-        <Divider orientation="vertical" flexItem sx={{ my: 0.5, display: { xs: 'none', sm: 'block' } }} />
-
-        {/* Width Slider */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: 80, md: 140 } }}>
-          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, whiteSpace: 'nowrap' }}>Size</Typography>
-          <Slider
-            size="small"
-            value={width}
-            min={1}
-            max={12}
-            onChange={(_, val) => setWidth(val as number)}
-            sx={{ color: '#2563eb' }}
-          />
-        </Box>
-
-        <Divider orientation="vertical" flexItem sx={{ my: 0.5, display: { xs: 'none', sm: 'block' } }} />
-
-        {/* Template Selector */}
-        <Select
-          size="small"
-          value={currentPage.template}
-          onChange={(e) => handleTemplateChange(e.target.value)}
-          sx={{ fontSize: '13px', borderRadius: 2, bgcolor: 'background.paper', minWidth: { xs: 110, md: 130 } }}
+      {/* Pagination indicator */}
+      {paginationVisible && (
+        <Box
+          ref={paginationRef}
+          sx={{
+            position: 'fixed',
+            bottom: 80,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            bgcolor: mode === 'dark' ? 'rgba(30,41,59,0.9)' : 'rgba(255,255,255,0.95)',
+            borderRadius: 2,
+            px: 2,
+            py: 1,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 200,
+            animation: 'fadeIn 0.2s ease'
+          }}
         >
-          <MenuItem value="ruled">Ruled Paper</MenuItem>
-          <MenuItem value="grid">Grid Paper</MenuItem>
-          <MenuItem value="dotted">Dotted Paper</MenuItem>
-          <MenuItem value="blank">Blank Paper</MenuItem>
-        </Select>
-
-        {/* Page Navigation */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <IconButton
-            size="small"
-            disabled={currentPageIndex === 0}
-            onClick={() => setCurrentPageIndex(currentPageIndex - 1)}
-            color="inherit"
-          >
-            <ChevronLeft size={18} />
+          <IconButton size="small" onClick={goToPrevPage} disabled={currentPageIndex === 0} sx={{ color: 'text.primary' }}>
+            <ChevronLeft size={20} />
           </IconButton>
-          <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap', minWidth: '36px', textAlign: 'center' }}>
-            {currentPageIndex + 1}/{notebook.pages.length}
+          <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 80, textAlign: 'center' }}>
+            {currentPageIndex + 1} / {notebook.pages.length}
           </Typography>
-          <IconButton
-            size="small"
-            disabled={currentPageIndex === notebook.pages.length - 1}
-            onClick={() => setCurrentPageIndex(currentPageIndex + 1)}
-            color="inherit"
-          >
-            <ChevronRight size={18} />
-          </IconButton>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<Plus size={14} />}
-            onClick={handleAddPage}
-            sx={{ textTransform: 'none', borderRadius: 2, ml: 0.5, py: 0.5, px: 1 }}
-          >
-            Page
-          </Button>
-          <IconButton size="small" onClick={handleDeletePage} sx={{ color: '#ef4444', ml: 0.5 }}>
-            <Trash2 size={18} />
+          <IconButton size="small" onClick={goToNextPage} disabled={currentPageIndex >= notebook.pages.length - 1} sx={{ color: 'text.primary' }}>
+            <ChevronRight size={20} />
           </IconButton>
         </Box>
-      </Box>
+      )}
 
       {/* Canvas Area */}
       <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: isLandscape ? 0 : { xs: 0.5, sm: 1, md: 4 }, overflow: 'hidden' }}>
@@ -701,13 +646,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             bgcolor: mode === 'dark' ? '#1e293b' : '#fff',
             position: 'relative',
             width: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : '100%',
-            maxWidth: isLandscape && pageMaxWidth > 0
-              ? `${pageMaxWidth}px`
-              : { xs: '98vw', sm: '94vw', md: '800px' },
-            maxHeight: isLandscape && pageMaxHeight > 0
-              ? `${pageMaxHeight}px`
-              : { xs: '82vh', sm: '88vh', md: 'none' },
-            aspectRatio: isLandscape ? landscapeAspectRatio : '4 / 5',
+            maxWidth: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : { xs: '98vw', sm: '94vw', md: '800px' },
+            maxHeight: isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px` : { xs: '82vh', sm: '88vh', md: 'none' },
+            aspectRatio: isLandscape ? `${landscapeRatioNum} / 1` : '4 / 5',
           }}
         >
           <canvas
@@ -731,7 +672,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         </Box>
       </Box>
 
-      {/* AI chat drawer — slides in from the right over the canvas */}
+      {/* AI chat drawer */}
       <Drawer
         anchor="right"
         open={chatOpen}
@@ -752,7 +693,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         }}
         slotProps={{ backdrop: { sx: { backdropFilter: 'blur(2px)' } } }}
       >
-        {/* Drawer header */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
@@ -769,8 +709,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             </IconButton>
           </Tooltip>
         </Box>
-
-        {/* Message list */}
         <Box sx={{ flex: 1, overflowY: 'auto', p: 1.5, display: 'flex', flexDirection: 'column', gap: 1, bgcolor: 'background.default' }}>
           {chatMessages.length === 0 && (
             <Box sx={{ margin: 'auto', textAlign: 'center', color: 'text.secondary', p: 2 }}>
@@ -786,18 +724,18 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                 maxWidth: '85%',
                 p: 1.2,
                 borderRadius: 2,
-                                bgcolor: msg.role === 'user' ? '#2563eb' : 'background.paper',
-                                color: msg.role === 'user' ? '#fff' : 'text.primary',
-                                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                                boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
-                                whiteSpace: 'pre-wrap',
-                                wordBreak: 'break-word',
-                                fontSize: '14px',
-                                lineHeight: 1.5,
-                              }}
-                            >
-                              {msg.content}
-                            </Box>
+                bgcolor: msg.role === 'user' ? '#2563eb' : 'background.paper',
+                color: msg.role === 'user' ? '#fff' : 'text.primary',
+                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                fontSize: '14px',
+                lineHeight: 1.5,
+              }}
+            >
+              {msg.content}
+            </Box>
           ))}
           {isSending && (
             <Box sx={{ maxWidth: '85%', p: 1.2, borderRadius: 2, bgcolor: 'background.paper', boxShadow: '0 1px 2px rgba(0,0,0,0.08)', color: 'text.secondary', fontSize: '14px' }}>
@@ -810,25 +748,25 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             </Box>
           )}
         </Box>
-
-        {/* Input row */}
         <Box sx={{ p: 1.5, borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-          <TextField
-            multiline
-            maxRows={4}
-            size="small"
-            placeholder="Type a message…"
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-            sx={{ flex: 1, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-            inputProps={{ 'aria-label': 'Chat message' }}
-          />
+          <Box sx={{ flex: 1 }}>
+            <TextField
+              multiline
+              maxRows={4}
+              size="small"
+              placeholder="Type a message…"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              inputProps={{ 'aria-label': 'Chat message' }}
+            />
+          </Box>
           <Tooltip title="Send">
             <IconButton
               color="primary"
@@ -841,6 +779,147 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           </Tooltip>
         </Box>
       </Drawer>
+
+      {/* Tool & Settings Dialog */}
+      <Dialog
+        open={toolDialogOpen}
+        onClose={() => setToolDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: mode === 'dark' ? '#1e293b' : '#ffffff',
+            color: 'text.primary',
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Tools & Settings</Typography>
+          <IconButton size="small" onClick={() => setToolDialogOpen(false)}>
+            <X size={18} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {/* Tools Section */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'text.secondary' }}>Tool</Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {([
+                { key: 'pen' as Tool, icon: <PenTool size={20} />, label: 'Pen' },
+                { key: 'highlighter' as Tool, icon: <Highlighter size={20} />, label: 'Highlighter' },
+                { key: 'eraser' as Tool, icon: <Eraser size={20} />, label: 'Eraser' },
+              ]).map(({ key, icon, label }) => (
+                <IconButton
+                  key={key}
+                  onClick={() => setTool(key)}
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 2,
+                    bgcolor: tool === key ? '#2563eb' : 'action.hover',
+                    color: tool === key ? '#fff' : 'text.primary',
+                    '&:hover': { bgcolor: tool === key ? '#1d4ed8' : 'action.selected' }
+                  }}
+                >
+                  {icon}
+                </IconButton>
+              ))}
+            </Box>
+          </Box>
+
+          {/* Size Section */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'text.secondary' }}>
+              Size: {width}
+            </Typography>
+            <Slider
+              value={width}
+              min={1}
+              max={12}
+              onChange={(_, val) => setWidth(val as number)}
+              sx={{ color: '#2563eb', '& .MuiSlider-thumb': { width: 16, height: 16 } }}
+            />
+          </Box>
+
+          {/* Colors Section */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'text.secondary' }}>Colors</Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              {PRESET_COLORS.map((c) => (
+                <Box
+                  key={c}
+                  onClick={() => setColor(c)}
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    bgcolor: c,
+                    cursor: 'pointer',
+                    border: color === c ? '3px solid #2563eb' : '3px solid transparent',
+                    transform: color === c ? 'scale(1.15)' : 'scale(1)',
+                    transition: 'all 0.15s ease',
+                    boxShadow: color === c ? '0 2px 8px rgba(37,99,235,0.3)' : 'none'
+                  }}
+                />
+              ))}
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                style={{ width: 36, height: 36, border: 'none', borderRadius: '50%', cursor: 'pointer', background: 'none' }}
+              />
+            </Box>
+          </Box>
+
+          {/* Paper Type Section */}
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'text.secondary' }}>Paper Type</Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {([
+                { key: 'blank' as Template, label: 'Blank' },
+                { key: 'ruled' as Template, label: 'Ruled' },
+                { key: 'grid' as Template, label: 'Grid' },
+                { key: 'dotted' as Template, label: 'Dotted' },
+              ]).map(({ key, label }) => (
+                <Button
+                  key={key}
+                  variant={template === key ? 'contained' : 'outlined'}
+                  onClick={() => handleChangeTemplate(key)}
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    px: 2,
+                    bgcolor: template === key ? '#2563eb' : 'transparent',
+                    color: template === key ? '#fff' : 'text.primary',
+                    borderColor: template === key ? '#2563eb' : 'divider',
+                    '&:hover': {
+                      bgcolor: template === key ? '#1d4ed8' : 'action.hover',
+                      borderColor: template === key ? '#1d4ed8' : 'divider'
+                    }
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setToolDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2 }}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translate(-50%, 10px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
+        }
+      `}</style>
     </Box>
   );
 };
+
+export default EditorView;
