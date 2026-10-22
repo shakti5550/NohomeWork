@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
-  Box, IconButton, Typography, Select, MenuItem, Slider, Tooltip, Divider, Button, Drawer, TextField
+  Box, IconButton, Typography, Select, MenuItem, Slider, Tooltip, Divider, Button, Drawer, TextField, useMediaQuery
 } from '@mui/material';
 import {
   ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight, Bot, X, Send
@@ -19,6 +19,7 @@ interface EditorViewProps {
 
 export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpdateNotebook }) => {
   const { mode } = useThemeMode();
+  const isLandscape = useMediaQuery('(orientation: landscape)');
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [tool, setTool] = useState<'pen' | 'highlighter' | 'eraser'>('pen');
   const [color, setColor] = useState('#000000');
@@ -43,7 +44,56 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const activePointerIdRef = useRef<number | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasAreaRef = useRef<HTMLDivElement | null>(null);
   const currentPage: Page = notebook.pages[currentPageIndex] || notebook.pages[0];
+
+  // Measure the canvas area's *real* available size (after the toolbar
+  // shrinks the viewport) so the page cap is anchored to what actually fits
+  // rather than the full window height — otherwise the bottom of the page
+  // would be clipped and unreachable.
+  const [canvasAreaSize, setCanvasAreaSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const el = canvasAreaRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setCanvasAreaSize({ width: r.width, height: r.height });
+    });
+    ro.observe(el);
+    const r = el.getBoundingClientRect();
+    setCanvasAreaSize({ width: r.width, height: r.height });
+    return () => ro.disconnect();
+  }, []);
+
+  // Canvas-area padding (matches the `p` prop: xs=0.5rem, sm=1rem, md=4rem).
+  // Used to subtract horizontal padding from the available width so the
+  // derived width keeps the page ratio intact.
+  const [padL, setPadL] = useState(0);
+  useEffect(() => {
+    const el = canvasAreaRef.current;
+    if (!el) return;
+    const measure = () => {
+      const cs = getComputedStyle(el);
+      setPadL(parseFloat(cs.paddingLeft) || 0);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Available height/width inside the canvas area (after its padding).
+  const availHeight = canvasAreaSize.height - 2 * padL;
+  const availWidth = canvasAreaSize.width - 2 * padL;
+
+  // In landscape, cap the page against the available height and derive the
+  // width from that cap so the 5/4 ratio is preserved. (CSS aspect-ratio
+  // only supplies a preferred size — it does not override a conflicting
+  // maxHeight, which would otherwise squash the page off-ratio.)
+  const pageMaxHeight = isLandscape ? Math.max(0, availHeight) : 0;
+  const pageMaxWidth = isLandscape && pageMaxHeight > 0
+    ? Math.min(availWidth, pageMaxHeight * (5 / 4))
+    : 0;
 
   // Latest values for use inside long-lived callbacks / timers.
   const notebookRef = useRef(notebook);
@@ -283,7 +333,16 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // committed page data changes — never while a stroke is in progress, so
   // the live ink isn't wiped mid-motion and the main thread stays free for
   // incoming pointer events.
+  //
+  // `canvasAreaHeight`/`isLandscape` are in the deps so a measured height
+  // change (page resize) re-sizes the backing store. A CSS-sized canvas
+  // otherwise scales its existing buffer instead of resizing it, which
+  // misaligns existing ink and offsets a live stroke from the pointer.
   useEffect(() => {
+    // Bail out before touching the bitmap while a stroke is in flight —
+    // resizing/clearing now would wipe the live ink mid-motion.
+    if (isDrawingRef.current) return;
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -303,11 +362,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     ctx.clearRect(0, 0, rect.width, rect.height);
     drawTemplate(ctx, rect.width, rect.height, currentPage.template);
 
-    if (isDrawingRef.current) return; // live stroke owns the canvas right now
-
     currentPage.strokes.forEach((stroke) => drawStroke(ctx, stroke));
     (currentPage.textAnnotations ?? []).forEach((ann) => drawTextAnnotation(ctx, ann, rect.width, rect.height));
-  }, [currentPage]);
+  }, [currentPage, pageMaxHeight, pageMaxWidth, isLandscape]);
 
   const stopDrawing = () => {
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
@@ -634,7 +691,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       </Box>
 
       {/* Canvas Area */}
-      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: { xs: 0.5, sm: 1, md: 4 }, overflow: 'auto', pb: { xs: 2, sm: 4 } }}>
+      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: { xs: 0.5, sm: 1, md: 4 }, overflow: 'hidden' }}>
         <Box
           sx={{
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
@@ -643,9 +700,13 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             bgcolor: mode === 'dark' ? '#1e293b' : '#fff',
             position: 'relative',
             width: '100%',
-            maxWidth: { xs: '98vw', sm: '94vw', md: '800px' },
-            maxHeight: { xs: '82vh', sm: '88vh', md: 'none' },
-            aspectRatio: '4 / 5',
+            maxWidth: isLandscape && pageMaxWidth > 0
+              ? `${pageMaxWidth}px`
+              : { xs: '98vw', sm: '94vw', md: '800px' },
+            maxHeight: isLandscape && pageMaxHeight > 0
+              ? `${pageMaxHeight}px`
+              : { xs: '82vh', sm: '88vh', md: 'none' },
+            aspectRatio: isLandscape ? '5 / 4' : '4 / 5',
           }}
         >
           <canvas
