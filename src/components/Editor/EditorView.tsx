@@ -5,8 +5,9 @@ import {
 import {
   ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight, Bot, X, Send
 } from 'lucide-react';
-import { Notebook, Page, Stroke, saveNotebook, ChatMessage } from '../../storage/cloud';
+import { Notebook, Page, Stroke, TextAnnotation, saveNotebook, ChatMessage } from '../../storage/cloud';
 import { ChatButton } from '../AIChat/ChatButton';
+import { DictationButton } from '../AIChat/DictationButton';
 import { sendMessage } from '../../services/ai';
 import { useThemeMode } from '../../ThemeContext';
 
@@ -22,6 +23,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const [tool, setTool] = useState<'pen' | 'highlighter' | 'eraser'>('pen');
   const [color, setColor] = useState('#000000');
   const [width, setWidth] = useState(3);
+
+  // Track the last pointer position so dictation knows where to place text.
+  const [lastPointerPos, setLastPointerPos] = useState<{ x: number; y: number } | null>(null);
 
   // AI chat — floating button + right-side drawer.
   const [chatOpen, setChatOpen] = useState(false);
@@ -161,6 +165,100 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     }
   };
 
+  const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number, fontSize: number, font: string): string[] => {
+    if (maxWidth <= 0) return [];
+    ctx.font = `${fontSize}px ${font}`;
+    const lines: string[] = [];
+    // Preserve explicit line breaks from the transcript.
+    for (const paragraph of text.split('\n')) {
+      if (paragraph.length === 0) {
+        lines.push('');
+        continue;
+      }
+      let line = '';
+      const words = paragraph.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        const testLine = line.length === 0 ? word : line + ' ' + word;
+        if (ctx.measureText(testLine).width > maxWidth && line.length > 0) {
+          lines.push(line);
+          line = word;
+        } else {
+          line = testLine;
+        }
+      }
+      // A single word wider than the max width: fall back to char breaking.
+      if (line.length > 0 && ctx.measureText(line).width > maxWidth) {
+        let chunk = '';
+        for (const ch of line) {
+          if (ctx.measureText(chunk + ch).width > maxWidth && chunk.length > 0) {
+            lines.push(chunk);
+            chunk = ch;
+          } else {
+            chunk += ch;
+          }
+        }
+        if (chunk.length > 0) lines.push(chunk);
+      } else if (line.length > 0) {
+        lines.push(line);
+      } else {
+        lines.push('');
+      }
+    }
+    return lines;
+  };
+
+  const drawTextAnnotation = (ctx: CanvasRenderingContext2D, ann: TextAnnotation, canvasWidth: number, canvasHeight: number) => {
+    ctx.save();
+    ctx.textBaseline = 'top';
+
+    const rightMargin = 24;
+    const maxWidth = canvasWidth - ann.x - rightMargin;
+    if (maxWidth <= 0 || canvasHeight <= 0) {
+      ctx.restore();
+      return;
+    }
+
+    // Three strategies, tried in order, so a tall block is never silently
+    // clipped off the bottom of the page:
+    //   1. Render at the requested size if the whole block fits.
+    //   2. Shift the block up within the page if it still fits vertically.
+    //   3. Shrink the font until the block fits (down to a floor) — this is
+    //      the only way to show a block taller than the canvas itself.
+    const MIN_FONT = 10;
+    const LINE_HEIGHT_RATIO = 1.4;
+
+    let fontSize = ann.fontSize;
+    let lines = wrapText(ctx, ann.text, maxWidth, fontSize, ann.font);
+    let lineHeight = fontSize * LINE_HEIGHT_RATIO;
+    let blockHeight = lines.length * lineHeight;
+
+    if (blockHeight > canvasHeight) {
+      // Block is taller than the page — scale the font down until it fits.
+      for (let attempt = 0; attempt < 30; attempt++) {
+        const needed = canvasHeight / blockHeight;
+        fontSize = Math.max(MIN_FONT, fontSize * Math.min(1, needed));
+        ctx.font = `${fontSize}px ${ann.font}`;
+        lines = wrapText(ctx, ann.text, maxWidth, fontSize, ann.font);
+        lineHeight = fontSize * LINE_HEIGHT_RATIO;
+        blockHeight = lines.length * lineHeight;
+        if (blockHeight <= canvasHeight || fontSize <= MIN_FONT) break;
+      }
+    }
+
+    // Vertically fit the block inside the page: prefer the original y, but
+    // slide it up if it would run off the bottom.
+    let startY = ann.y;
+    if (startY + blockHeight > canvasHeight) {
+      startY = Math.max(0, canvasHeight - blockHeight - 8);
+    }
+
+    ctx.font = `${fontSize}px ${ann.font}`;
+    ctx.fillStyle = ann.color;
+    lines.forEach((line, i) => ctx.fillText(line, ann.x, startY + i * lineHeight));
+    ctx.restore();
+  };
+
   const drawStroke = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
     if (stroke.points.length === 0) return;
     ctx.save();
@@ -208,6 +306,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     if (isDrawingRef.current) return; // live stroke owns the canvas right now
 
     currentPage.strokes.forEach((stroke) => drawStroke(ctx, stroke));
+    (currentPage.textAnnotations ?? []).forEach((ann) => drawTextAnnotation(ctx, ann, rect.width, rect.height));
   }, [currentPage]);
 
   const stopDrawing = () => {
@@ -243,6 +342,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    setLastPointerPos({ x, y });
 
     if (tool === 'eraser') {
       eraseStrokeAt(x, y);
@@ -276,6 +376,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    setLastPointerPos({ x, y });
 
     const stroke = currentStrokeRef.current;
     const lastPt = stroke.points[stroke.points.length - 1];
@@ -330,6 +431,27 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     }
   };
 
+  const handleDictate = (text: string, x: number, y: number) => {
+    const ann: TextAnnotation = {
+      id: 'ta_' + Math.random().toString(36).substring(2, 9),
+      x, y,
+      text,
+      font: 'system-ui',
+      fontSize: width * 5 + 8, // scale font with brush size (8–68px)
+      color,
+      createdAt: Date.now(),
+    };
+    const nb = notebookRef.current;
+    const idx = pageIndexRef.current;
+    const page = nb.pages[idx];
+    const updatedPages = [...nb.pages];
+    updatedPages[idx] = {
+      ...page,
+      textAnnotations: [...(page.textAnnotations ?? []), ann],
+    };
+    updateCurrentNotebook(updatedPages);
+  };
+
   const handleAddPage = () => {
     const newPage: Page = {
       id: 'pg_' + Math.random().toString(36).substring(2, 9),
@@ -363,6 +485,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default', color: 'text.primary' }}>
+      {/* Floating dictation button — bottom-right, just above the AI chat button */}
+      <DictationButton onDictate={handleDictate} lastPointerPos={lastPointerPos} />
+
       {/* Floating AI chat button — bottom-right of the viewport */}
       <ChatButton onClick={() => setChatOpen((o) => !o)} isOpen={chatOpen} />
 

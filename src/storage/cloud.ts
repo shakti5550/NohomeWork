@@ -16,11 +16,28 @@ export interface Stroke {
   points: StrokePoint[];
 }
 
+/**
+ * A piece of text rendered on the page — produced by dictation (speech to
+ * text) or typed inline. Positions are stored in canvas CSS pixels so they
+ * scale with the backing-store DPR transform.
+ */
+export interface TextAnnotation {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  font: string;       // e.g. 'system-ui'
+  fontSize: number;   // CSS px
+  color: string;
+  createdAt: number;
+}
+
 export interface Page {
   id: string;
   pageNumber: number;
   template: 'blank' | 'ruled' | 'dotted' | 'grid';
   strokes: Stroke[];
+  textAnnotations?: TextAnnotation[];
   backgroundPdfUrl?: string;
 }
 
@@ -141,6 +158,7 @@ export async function getAllNotebooks(): Promise<Notebook[]> {
       pageNumber: p.page_number,
       template: p.template as Page['template'],
       strokes: p.strokes ?? [],
+      textAnnotations: p.text_annotations ?? [],
     })),
   }));
 }
@@ -179,6 +197,7 @@ export async function getNotebook(id: string): Promise<Notebook | undefined> {
       pageNumber: p.page_number,
       template: p.template as Page['template'],
       strokes: p.strokes ?? [],
+      textAnnotations: p.text_annotations ?? [],
     })),
   };
 }
@@ -235,6 +254,7 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
     page_number: page.pageNumber,
     template: page.template,
     strokes: page.strokes,
+    text_annotations: page.textAnnotations ?? [],
     updated_at: now,
   }));
   if (rows.length > 0) {
@@ -275,6 +295,7 @@ export async function createDefaultNotebook(title: string = 'Untitled Notebook')
         pageNumber: 1,
         template: 'ruled',
         strokes: [],
+        textAnnotations: [],
       },
     ],
   };
