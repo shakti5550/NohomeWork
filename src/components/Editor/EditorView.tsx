@@ -595,18 +595,26 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         style={{ bottom: 160, right: 16 }}
       />
 
-      {/* Floating dictation button */}
-      <DictationButton onDictate={handleDictate} lastPointerPos={lastPointerPos} />
+      {/* Floating dictation button — same style as back button, above chat */}
+      <DictationButton
+        onDictate={handleDictate}
+        lastPointerPos={lastPointerPos}
+        style={{ bottom: 72, right: 16, backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff', color: '#94a3b8', borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0' }}
+      />
 
-      {/* Floating AI chat button */}
-      <ChatButton onClick={() => setChatOpen((o) => !o)} isOpen={chatOpen} />
+      {/* Floating AI chat button — same style as back button */}
+      <ChatButton
+        onClick={() => setChatOpen((o) => !o)}
+        isOpen={chatOpen}
+        style={{ bottom: 16, right: 16, borderColor: '#2563eb' }}
+      />
 
-      {/* Delete Page Button — bottom-right, below AI chat */}
+      {/* Delete Page Button — bottom-right, below AI chat, same style as back button (red accent) */}
       <FloatingBtn
         onClick={handleDeletePage}
         tooltip="Delete Page"
         icon={<Trash2 size={20} />}
-        style={{ bottom: 16, right: 16, color: '#ef4444', borderColor: '#fecaca' }}
+        style={{ bottom: 16, right: 76, color: '#ef4444', borderColor: '#fecaca' }}
       />
 
       {/* Pagination indicator */}
@@ -644,7 +652,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       )}
 
       {/* Canvas Area */}
-      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: isLandscape ? 0 : { xs: 1, sm: 2, md: 5 }, overflow: 'hidden' }}>
+      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: { xs: 1, sm: 2, md: 5 }, overflow: 'hidden' }}>
         <Box
           sx={{
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',

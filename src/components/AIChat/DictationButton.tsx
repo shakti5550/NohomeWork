@@ -8,6 +8,7 @@ interface DictationButtonProps {
   onDictate: (text: string, x: number, y: number) => void;
   /** Last known pointer position on the canvas (CSS px) — text is placed here. */
   lastPointerPos: { x: number; y: number } | null;
+  style?: React.CSSProperties;
 }
 
 /**
@@ -19,7 +20,7 @@ interface DictationButtonProps {
  * Uses the Web Speech API (SpeechRecognition) for live transcription and
  * falls back gracefully when the browser doesn't support it.
  */
-export const DictationButton: React.FC<DictationButtonProps> = ({ onDictate, lastPointerPos }) => {
+export const DictationButton: React.FC<DictationButtonProps> = ({ onDictate, lastPointerPos, style }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [listening, setListening] = useState(false);
@@ -108,6 +109,7 @@ export const DictationButton: React.FC<DictationButtonProps> = ({ onDictate, las
               transform: 'scale(1.08)',
             },
             WebkitTapHighlightColor: 'transparent',
+            ...style
           }}
         >
           {listening ? <MicOff size={isMobile ? 20 : 24} /> : <Mic size={isMobile ? 20 : 24} />}

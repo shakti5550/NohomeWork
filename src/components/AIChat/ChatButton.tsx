@@ -6,13 +6,14 @@ import { useThemeMode } from '../../ThemeContext';
 interface ChatButtonProps {
   onClick: () => void;
   isOpen: boolean;
+  style?: React.CSSProperties;
 }
 
 /**
  * Floating AI button anchored to the bottom-right of the editor canvas.
  * Uses `position: fixed` so it stays visible while the canvas scrolls.
  */
-export const ChatButton: React.FC<ChatButtonProps> = ({ onClick, isOpen }) => {
+export const ChatButton: React.FC<ChatButtonProps> = ({ onClick, isOpen, style }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { mode } = useThemeMode();
@@ -56,6 +57,7 @@ export const ChatButton: React.FC<ChatButtonProps> = ({ onClick, isOpen }) => {
           justifyContent: 'center',
           // Prevent the button from stealing focus from the canvas while drawing.
           WebkitTapHighlightColor: 'transparent',
+          ...style
         }}
       >
         <Bot size={isMobile ? 22 : 26} />
