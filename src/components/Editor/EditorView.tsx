@@ -78,13 +78,22 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const availHeight = canvasAreaSize.height;
   const availWidth = Math.max(0, canvasAreaSize.width);
 
+  // In landscape, use a wider aspect ratio so the page fills more of the
+  // available width on wide laptop screens, while keeping a reasonable page
+  // shape. Clamped between 5/4 (1.25) and 8/5 (1.6) — narrower than the
+  // available space would let it grow, so the page never becomes a strip.
+  const landscapeRatioNum = isLandscape
+    ? Math.max(1.25, Math.min(availWidth / Math.max(1, availHeight), 1.6))
+    : 1.25;
+  const landscapeAspectRatio = isLandscape ? `${landscapeRatioNum} / 1` : '4 / 5';
+
   // In landscape, cap the page against the available height and derive the
-  // width from that cap so the 5/4 ratio is preserved. (CSS aspect-ratio
-  // only supplies a preferred size — it does not override a conflicting
+  // width from that cap so the ratio is preserved. (CSS aspect-ratio only
+  // supplies a preferred size — it does not override a conflicting
   // maxHeight, which would otherwise squash the page off-ratio.)
   const pageMaxHeight = isLandscape ? Math.max(0, availHeight) : 0;
   const pageMaxWidth = isLandscape && pageMaxHeight > 0
-    ? Math.min(availWidth, pageMaxHeight * (5 / 4))
+    ? Math.min(availWidth, pageMaxHeight * landscapeRatioNum)
     : 0;
 
   // Latest values for use inside long-lived callbacks / timers.
@@ -683,7 +692,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       </Box>
 
       {/* Canvas Area */}
-      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: { xs: 0.5, sm: 1, md: 4 }, overflow: 'hidden' }}>
+      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: isLandscape ? 0 : { xs: 0.5, sm: 1, md: 4 }, overflow: 'hidden' }}>
         <Box
           sx={{
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
@@ -698,7 +707,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             maxHeight: isLandscape && pageMaxHeight > 0
               ? `${pageMaxHeight}px`
               : { xs: '82vh', sm: '88vh', md: 'none' },
-            aspectRatio: isLandscape ? '5 / 4' : '4 / 5',
+            aspectRatio: isLandscape ? landscapeAspectRatio : '4 / 5',
           }}
         >
           <canvas
