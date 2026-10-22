@@ -66,9 +66,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       console.log('[Editor] canvas avail w:', Math.round(availW), 'h:', Math.round(availH),
         'padH:', Math.round(padH), 'padV:', Math.round(padV),
         'viewport w:', Math.round(window.innerWidth), 'h:', Math.round(window.innerHeight));
-      console.log('[Editor] canvas avail w:', Math.round(availW), 'h:', Math.round(availH),
-        'padH:', Math.round(padH), 'padV:', Math.round(padV),
-        'viewport w:', Math.round(window.innerWidth), 'h:', Math.round(window.innerHeight));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -89,7 +86,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const pageMaxWidth = isLandscape && pageMaxHeight > 0
     ? Math.min(availWidth, pageMaxHeight * (5 / 4))
     : 0;
-  console.log('[Editor] isLandscape:', isLandscape, 'pageMaxHeight:', pageMaxHeight, 'pageMaxWidth:', pageMaxWidth, 'availHeight:', availHeight, 'availWidth:', availWidth);
 
   // Latest values for use inside long-lived callbacks / timers.
   const notebookRef = useRef(notebook);
@@ -695,7 +691,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             overflow: 'hidden',
             bgcolor: mode === 'dark' ? '#1e293b' : '#fff',
             position: 'relative',
-            width: '100%',
+            width: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : '100%',
             maxWidth: isLandscape && pageMaxWidth > 0
               ? `${pageMaxWidth}px`
               : { xs: '98vw', sm: '94vw', md: '800px' },
