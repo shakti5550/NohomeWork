@@ -178,9 +178,15 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     return () => {
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchend', handleTouchEnd);
-      if (paginationTimeoutRef.current) clearTimeout(paginationTimeoutRef.current);
     };
   }, [goToNextPage, goToPrevPage]);
+
+  // Cleanup pagination timer on unmount
+  useEffect(() => {
+    return () => {
+      if (paginationTimeoutRef.current) clearTimeout(paginationTimeoutRef.current);
+    };
+  }, []);
 
   // ─── Page operations ──────────────────────────────────────────────────────
   const handleAddPage = () => {
@@ -193,6 +199,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     const updatedPages = [...notebook.pages, newPage];
     updateCurrentNotebook(updatedPages, 0);
     setCurrentPageIndex(updatedPages.length - 1);
+    showPagination();
   };
 
   const handleDeletePage = () => {
@@ -585,15 +592,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         onClick={handleAddPage}
         tooltip="Add Page"
         icon={<Plus size={20} />}
-        style={{ bottom: 140, right: 16 }}
-      />
-
-      {/* Delete Page Button — below AI chat button */}
-      <FloatingBtn
-        onClick={handleDeletePage}
-        tooltip="Delete Page"
-        icon={<Trash2 size={20} />}
-        style={{ bottom: 16, right: 16, color: '#ef4444', borderColor: '#fecaca' }}
+        style={{ bottom: 160, right: 16 }}
       />
 
       {/* Floating dictation button */}
@@ -601,6 +600,14 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
       {/* Floating AI chat button */}
       <ChatButton onClick={() => setChatOpen((o) => !o)} isOpen={chatOpen} />
+
+      {/* Delete Page Button — bottom-right, below AI chat */}
+      <FloatingBtn
+        onClick={handleDeletePage}
+        tooltip="Delete Page"
+        icon={<Trash2 size={20} />}
+        style={{ bottom: 16, right: 16, color: '#ef4444', borderColor: '#fecaca' }}
+      />
 
       {/* Pagination indicator */}
       {paginationVisible && (
@@ -637,7 +644,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       )}
 
       {/* Canvas Area */}
-      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: isLandscape ? 0 : { xs: 0.5, sm: 1, md: 4 }, overflow: 'hidden' }}>
+      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: isLandscape ? 0 : { xs: 1, sm: 2, md: 5 }, overflow: 'hidden' }}>
         <Box
           sx={{
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
