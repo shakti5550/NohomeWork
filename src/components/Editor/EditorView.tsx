@@ -97,14 +97,10 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // taller paper so the extra top space is used.
   const isTabletMobile = useMediaQuery('(max-width: 900px)');
 
-  // Back-button style — white capsule with a black icon. On tablet/mobile the
-  // mic and AI chat buttons adopt this so the whole right-side stack reads as
-  // one consistent control group (delete stays red).
-  const backBtnStyle: React.CSSProperties = {
-    backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.1)' : '#ffffff',
-    color: mode === 'dark' ? '#f8fafc' : '#1e293b',
-    borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
-  };
+  // Short viewports (phones in landscape, split windows, short tablets) can't
+  // fit the full vertical button stack without clipping the bottom button.
+  // On these screens the controls collapse into a horizontal bottom row.
+  const isShortViewport = useMediaQuery('(max-height: 364px)');
 
   const landscapeRatioNum = isLandscape
     ? Math.max(1.25, Math.min(availWidth / Math.max(1, availHeight), 1.6))
@@ -640,66 +636,116 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     onBack();
   }, [onBack]);
 
+  // The six floating controls, in vertical order. On short viewports the
+  // stack collapses into a horizontal bottom row so nothing is clipped off.
+  const floatButtons: { comp: React.ElementType; props: Record<string, any> }[] = [
+    {
+      comp: FloatingBtn,
+      props: {
+        onClick: handleBack,
+        tooltip: 'Back to Library',
+        icon: <ArrowLeft size={20} />,
+        style: { top: 16, left: 16 },
+      },
+    },
+    {
+      comp: FloatingBtn,
+      props: {
+        onClick: () => setToolDialogOpen(true),
+        tooltip: 'Tools & Settings',
+        icon: <Pencil size={20} />,
+        style: { top: 76, left: 16 },
+      },
+    },
+    {
+      comp: FloatingBtn,
+      props: {
+        onClick: handleAddPage,
+        tooltip: 'Add Page',
+        icon: <Plus size={20} />,
+        style: { top: 136, left: 16 },
+      },
+    },
+    {
+      comp: FloatingBtn,
+      props: {
+        onClick: handleDeletePage,
+        tooltip: 'Delete Page',
+        icon: <Trash2 size={20} />,
+        style: { top: 196, left: 16, color: '#ef4444', borderColor: '#fecaca' },
+      },
+    },
+    {
+      comp: DictationButton,
+      props: {
+        onDictate: handleDictate,
+        onInterim: handleInterim,
+        lastPointerPos: lastPointerPos,
+        style: {
+          top: 256, left: 16,
+          backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff',
+          color: mode === 'dark' ? '#f8fafc' : '#64748b',
+          borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+        },
+      },
+    },
+    {
+      comp: ChatButton,
+      props: {
+        onClick: () => setChatOpen((o) => !o),
+        isOpen: chatOpen,
+        style: { top: 316, left: 16 },
+      },
+    },
+  ];
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
-      {/* Back Button — top-left */}
-      <FloatingBtn
-        onClick={handleBack}
-        tooltip="Back to Library"
-        icon={<ArrowLeft size={20} />}
-        style={{ top: 16, left: 16 }}
-      />
-
-      {/* Tool Button — below back button */}
-      <FloatingBtn
-        onClick={() => setToolDialogOpen(true)}
-        tooltip="Tools & Settings"
-        icon={<Pencil size={20} />}
-        style={{ top: 76, left: 16 }}
-      />
-
-      {/* Right-side button stack — 48px buttons, 12px gaps, 16px from edges.
-          Order top→bottom: Add Page, Mic, AI Chat, Delete. */}
-      <FloatingBtn
-        onClick={handleAddPage}
-        tooltip="Add Page"
-        icon={<Plus size={20} />}
-        style={{ bottom: 204, right: 16 }}
-      />
-
-      <DictationButton
-        onDictate={handleDictate}
-        onInterim={handleInterim}
-        lastPointerPos={lastPointerPos}
-        style={{
-          bottom: 144, right: 16,
-          // Tablet/mobile: match the back button's white capsule + black icon.
-          // Laptop: keep the existing dark-accent styling.
-          ...(isTabletMobile ? backBtnStyle : {
-            backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff',
-            color: mode === 'dark' ? '#f8fafc' : '#64748b',
-            borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
-          }),
-        }}
-      />
-
-      <ChatButton
-        onClick={() => setChatOpen((o) => !o)}
-        isOpen={chatOpen}
-        style={{
-          bottom: 84, right: 16,
-          // Tablet/mobile: match the back button's white capsule + black icon.
-          // Laptop: keep the existing blue-accent styling.
-          ...(isTabletMobile ? backBtnStyle : {}),
-        }}
-      />
-
-      <FloatingBtn
-        onClick={handleDeletePage}
-        tooltip="Delete Page"
-        icon={<Trash2 size={20} />}
-        style={{ bottom: 24, right: 16, color: '#ef4444', borderColor: '#fecaca' }}
-      />
+      {/* Single left-side floating button stack — 48px buttons, 12px gaps,
+          16px from the left edge. Order top→bottom:
+          Back → Tools → Add Page → Delete → Mic → AI Chat. */}
+      {isShortViewport ? (
+          // Short viewports: a wrapping bottom strip. flexWrap keeps every
+          // control reachable even when the viewport is both short and narrow.
+          // Each button keeps its own colors — only position is overridden.
+          <Box
+            className="nhw-float-row"
+            sx={{
+              position: 'fixed',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 1,
+              p: 1,
+              bgcolor: 'background.default',
+              opacity: 0.97,
+              zIndex: 100,
+              overflowX: 'auto',
+            }}
+          >
+            {floatButtons.map((btn, i) => {
+              const Comp = btn.comp;
+              return (
+                <Comp
+                  key={`nhw-float-${i}`}
+                  {...btn.props}
+                  style={{ ...btn.props.style, position: 'static', flex: '0 0 auto' }}
+                />
+              );
+            })}
+          </Box>
+        ) : (
+          <div className="nhw-float-stack" data-side="left">
+            {floatButtons.map((btn, i) => {
+              const Comp = btn.comp;
+              return (
+                <Comp key={`nhw-float-${i}`} {...btn.props} />
+              );
+            })}
+          </div>
+        )}
 
       {/* Pagination indicator */}
       {paginationVisible && (
