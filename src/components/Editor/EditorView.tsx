@@ -859,7 +859,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           {/* Colors Section */}
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: 'text.secondary' }}>Colors</Typography>
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
               {PRESET_COLORS.map((c) => (
                 <Box
                   key={c}
@@ -877,12 +877,34 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                   }}
                 />
               ))}
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                style={{ width: 36, height: 36, border: 'none', borderRadius: '50%', cursor: 'pointer', background: 'none' }}
-              />
+              <Tooltip title="Color palette" placement="top">
+                <label style={{ cursor: 'pointer', display: 'inline-block' }}>
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    style={{
+                      position: 'absolute',
+                      left: '-9999px',
+                      width: '1px',
+                      height: '1px',
+                      opacity: 0
+                    }}
+                  />
+                  <Box
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #ff0000 0%, #ff8800 14%, #ffff00 28%, #00ff00 42%, #00ffff 57%, #0000ff 71%, #8800ff 85%, #ff00ff 100%)',
+                      border: '2px solid rgba(0,0,0,0.1)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                      '&:hover': { transform: 'scale(1.1)' },
+                      transition: 'transform 0.15s ease'
+                    }}
+                  />
+                </label>
+              </Tooltip>
             </Box>
           </Box>
 
