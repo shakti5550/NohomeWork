@@ -234,11 +234,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         ctx.lineTo(width - 40, y);
         ctx.stroke();
       }
-      ctx.strokeStyle = '#fca5a5';
-      ctx.beginPath();
-      ctx.moveTo(80, 0);
-      ctx.lineTo(80, height);
-      ctx.stroke();
     } else if (tpl === 'grid') {
       const gridSize = 32;
       for (let x = 0; x < width; x += gridSize) {
