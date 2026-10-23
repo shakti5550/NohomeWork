@@ -102,6 +102,10 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // On these screens the controls collapse into a horizontal bottom row.
   const isShortViewport = useMediaQuery('(max-height: 364px)');
 
+  // Tablet held vertically — a horizontal top row keeps the controls clear of
+  // the status bar and the top of the paper, in the same left-to-right order.
+  const isTabletPortrait = useMediaQuery('(min-width: 768px) and (max-width: 1024px) and (orientation: portrait)');
+
   const landscapeRatioNum = isLandscape
     ? Math.max(1.25, Math.min(availWidth / Math.max(1, availHeight), 1.6))
     : 1.25;
@@ -704,7 +708,23 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       {/* Single left-side floating button stack — 48px buttons, 12px gaps,
           16px from the left edge. Order top→bottom:
           Back → Tools → Add Page → Delete → Mic → AI Chat. */}
-      {isShortViewport ? (
+      {isTabletPortrait ? (
+          // Tablet held vertically: a horizontal top row keeps the controls
+          // clear of the status bar and the top of the paper, in the same
+          // left-to-right order. Each button keeps its own colors.
+          <Box className="nhw-float-row" sx={{ position: 'fixed', top: 0, left: 0, right: 0, display: 'flex', gap: 1, p: 1, bgcolor: 'background.default', opacity: 0.97, zIndex: 100 }}>
+            {floatButtons.map((btn, i) => {
+              const Comp = btn.comp;
+              return (
+                <Comp
+                  key={`nhw-float-${i}`}
+                  {...btn.props}
+                  style={{ ...btn.props.style, position: 'fixed', top: 52, left: `calc(16px + ${i} * (48px + 12px))` }}
+                />
+              );
+            })}
+          </Box>
+        ) : isShortViewport ? (
           // Short viewports: a wrapping bottom strip. flexWrap keeps every
           // control reachable even when the viewport is both short and narrow.
           // Each button keeps its own colors — only position is overridden.
