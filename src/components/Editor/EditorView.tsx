@@ -565,11 +565,35 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     </Tooltip>
   );
 
+  // Force immediate save before navigating away
+  const handleBack = useCallback(async () => {
+    // Flush any pending debounced save immediately
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    // Ensure current stroke is committed
+    if (isDrawingRef.current && currentStrokeRef.current) {
+      stopDrawing();
+    }
+    // Log strokes before save for debugging
+    const strokes = notebookRef.current.pages[pageIndexRef.current]?.strokes;
+    console.log('[Editor] Saving', strokes?.length ?? 0, 'strokes before back');
+    // Wait for save to complete before navigating
+    try {
+      await saveNotebook(notebookRef.current);
+      console.log('[Editor] Save completed');
+    } catch (err) {
+      console.error('[Editor] Save failed:', err);
+    }
+    onBack();
+  }, [onBack]);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
       {/* Back Button — top-left */}
       <FloatingBtn
-        onClick={onBack}
+        onClick={handleBack}
         tooltip="Back to Library"
         icon={<ArrowLeft size={20} />}
         style={{ top: 16, left: 16 }}

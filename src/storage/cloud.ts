@@ -258,7 +258,9 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
     updated_at: now,
   }));
   if (rows.length > 0) {
-    const { error: pErr } = await supabase.from('pages').upsert(rows);
+    const { error: pErr } = await supabase
+      .from('pages')
+      .upsert(rows, { onConflict: 'id' });
     if (pErr) throw pErr;
   }
 
