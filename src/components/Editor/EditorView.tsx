@@ -597,7 +597,10 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           height: 48,
           borderRadius: '50%',
           bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.1)' : '#ffffff',
-          color: mode === 'dark' ? '#f8fafc' : '#1e293b',
+          // Tablet/mobile: black icons always (except delete). Laptop: respect theme.
+          color: isTabletMobile
+            ? '#1e293b'
+            : (style as any)?.color ?? (mode === 'dark' ? '#f8fafc' : '#1e293b'),
           border: '1px solid',
           borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
