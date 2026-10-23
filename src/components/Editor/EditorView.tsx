@@ -97,14 +97,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // taller paper so the extra top space is used.
   const isTabletMobile = useMediaQuery('(max-width: 900px)');
 
-  // Paper height: fill more of the viewport on tablet/mobile so the empty
-  // top space is used. Laptop keeps the existing behavior.
-  const paperMaxHeight = isLandscape && pageMaxHeight > 0
-    ? `${pageMaxHeight}px`
-    : isTabletMobile ? '96vh'
-    : { xs: '82vh', sm: '88vh', md: 'none' };
-  const canvasPadding = isTabletMobile ? 0.25 : { xs: 0.25, sm: 0.5, md: 1 };
-
   // Back-button style — white capsule with a black icon. On tablet/mobile the
   // mic and AI chat buttons adopt this so the whole right-side stack reads as
   // one consistent control group (delete stays red).
@@ -121,6 +113,14 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const pageMaxWidth = isLandscape && pageMaxHeight > 0
     ? Math.min(availWidth, pageMaxHeight * landscapeRatioNum)
     : 0;
+
+  // Paper height: fill more of the viewport on tablet/mobile so the empty
+  // top space is used. Laptop keeps the existing behavior.
+  const paperMaxHeight = isLandscape && pageMaxHeight > 0
+    ? `${pageMaxHeight}px`
+    : isTabletMobile ? '96vh'
+    : { xs: '82vh', sm: '88vh', md: 'none' };
+  const canvasPadding = isTabletMobile ? 0.25 : { xs: 0.25, sm: 0.5, md: 1 };
 
   // Notebook ref for callbacks
   const notebookRef = useRef(notebook);
