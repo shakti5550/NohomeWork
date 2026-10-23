@@ -886,21 +886,28 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                     borderRadius: '50%',
                     cursor: 'pointer',
                     outline: 'none',
+                    overflow: 'hidden',
+                    border: '2px solid rgba(0,0,0,0.1)',
                     '&:focus-visible': {
                       boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.5)'
                     }
                   }}
                 >
-                  <Box
-                    sx={{
-                      width: '100%',
-                      height: '100%',
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #ff0000 0%, #ff8800 14%, #ffff00 28%, #00ff00 42%, #00ffff 57%, #0000ff 71%, #8800ff 85%, #ff00ff 100%)',
-                      border: '2px solid rgba(0,0,0,0.1)',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-                    }}
-                  />
+                  <svg width="36" height="36" viewBox="0 0 36 36" style={{ display: 'block' }}>
+                    <defs>
+                      <linearGradient id="rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#ff0000" />
+                        <stop offset="14%" stopColor="#ff8800" />
+                        <stop offset="28%" stopColor="#ffff00" />
+                        <stop offset="42%" stopColor="#00ff00" />
+                        <stop offset="57%" stopColor="#00ffff" />
+                        <stop offset="71%" stopColor="#0000ff" />
+                        <stop offset="85%" stopColor="#8800ff" />
+                        <stop offset="100%" stopColor="#ff00ff" />
+                      </linearGradient>
+                    </defs>
+                    <circle cx="18" cy="18" r="16" fill="url(#rainbow)" />
+                  </svg>
                   <input
                     type="color"
                     value={color}
@@ -957,11 +964,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setToolDialogOpen(false)} variant="outlined" sx={{ borderRadius: 2 }}>
-            Close
-          </Button>
-        </DialogActions>
       </Dialog>
 
       <style>{`
