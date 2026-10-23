@@ -92,6 +92,28 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const availHeight = canvasAreaSize.height;
   const availWidth = Math.max(0, canvasAreaSize.width);
 
+  // Tablet / mobile portrait — narrower than a laptop. These screens get the
+  // compact styling (black icons, back-button-style floating buttons) and a
+  // taller paper so the extra top space is used.
+  const isTabletMobile = useMediaQuery('(max-width: 900px)');
+
+  // Paper height: fill more of the viewport on tablet/mobile so the empty
+  // top space is used. Laptop keeps the existing behavior.
+  const paperMaxHeight = isLandscape && pageMaxHeight > 0
+    ? `${pageMaxHeight}px`
+    : isTabletMobile ? '96vh'
+    : { xs: '82vh', sm: '88vh', md: 'none' };
+  const canvasPadding = isTabletMobile ? 0.25 : { xs: 0.25, sm: 0.5, md: 1 };
+
+  // Back-button style — white capsule with a black icon. On tablet/mobile the
+  // mic and AI chat buttons adopt this so the whole right-side stack reads as
+  // one consistent control group (delete stays red).
+  const backBtnStyle: React.CSSProperties = {
+    backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.1)' : '#ffffff',
+    color: mode === 'dark' ? '#f8fafc' : '#1e293b',
+    borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+  };
+
   const landscapeRatioNum = isLandscape
     ? Math.max(1.25, Math.min(availWidth / Math.max(1, availHeight), 1.6))
     : 1.25;
@@ -646,13 +668,27 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         onDictate={handleDictate}
         onInterim={handleInterim}
         lastPointerPos={lastPointerPos}
-        style={{ bottom: 144, right: 16, backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff', color: mode === 'dark' ? '#f8fafc' : '#64748b', borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0' }}
+        style={{
+          bottom: 144, right: 16,
+          // Tablet/mobile: match the back button's white capsule + black icon.
+          // Laptop: keep the existing dark-accent styling.
+          ...(isTabletMobile ? backBtnStyle : {
+            backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff',
+            color: mode === 'dark' ? '#f8fafc' : '#64748b',
+            borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+          }),
+        }}
       />
 
       <ChatButton
         onClick={() => setChatOpen((o) => !o)}
         isOpen={chatOpen}
-        style={{ bottom: 84, right: 16 }}
+        style={{
+          bottom: 84, right: 16,
+          // Tablet/mobile: match the back button's white capsule + black icon.
+          // Laptop: keep the existing blue-accent styling.
+          ...(isTabletMobile ? backBtnStyle : {}),
+        }}
       />
 
       <FloatingBtn
@@ -697,7 +733,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       )}
 
       {/* Canvas Area */}
-      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: { xs: 0.25, sm: 0.5, md: 1 }, overflow: 'hidden' }}>
+      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: canvasPadding, overflow: 'hidden' }}>
         <Box
           sx={{
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
@@ -707,7 +743,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             position: 'relative',
             width: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : '100%',
             maxWidth: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : { xs: '98vw', sm: '94vw', md: '800px' },
-            maxHeight: isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px` : { xs: '82vh', sm: '88vh', md: 'none' },
+            maxHeight: isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px` : paperMaxHeight,
             aspectRatio: isLandscape ? `${landscapeRatioNum} / 1` : '4 / 5',
           }}
         >
@@ -877,9 +913,19 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                     width: 56,
                     height: 56,
                     borderRadius: 2,
-                    bgcolor: tool === key ? '#2563eb' : 'action.hover',
-                    color: tool === key ? '#fff' : 'text.primary',
-                    '&:hover': { bgcolor: tool === key ? '#1d4ed8' : 'action.selected' }
+                    // Tablet/mobile: black icons on a light background.
+                    // Laptop: blue accent with white icons.
+                    bgcolor: isTabletMobile
+                      ? (tool === key ? '#1e293b' : 'action.hover')
+                      : (tool === key ? '#2563eb' : 'action.hover'),
+                    color: isTabletMobile
+                      ? (tool === key ? '#ffffff' : '#1e293b')
+                      : (tool === key ? '#fff' : 'text.primary'),
+                    '&:hover': {
+                      bgcolor: isTabletMobile
+                        ? (tool === key ? '#0f172a' : 'action.selected')
+                        : (tool === key ? '#1d4ed8' : 'action.selected')
+                    }
                   }}
                 >
                   {icon}

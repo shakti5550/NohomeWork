@@ -22,7 +22,7 @@ interface DictationButtonProps {
  * Uses the Web Speech API (SpeechRecognition) for live transcription and
  * falls back gracefully when the browser doesn't support it.
  */
-export const DictationButton: React.FC<DictationButtonProps> = ({ onDictate, onInterim, lastPointerPos, style }) => {
+export const DictationButton: React.FC<DictationButtonProps> = ({ onDictate, onInterim, lastPointerPos, style = {} }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [listening, setListening] = useState(false);
@@ -98,16 +98,32 @@ export const DictationButton: React.FC<DictationButtonProps> = ({ onDictate, onI
             height: 48,
             borderRadius: '50%',
             zIndex: 999,
-            color: listening ? '#ef4444' : '#94a3b8',
-            border: listening ? '2px solid #ef4444' : '2px solid transparent',
-            bgcolor: listening ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.9)',
+            // Non-listening state: let the caller override via `style`.
+            // Default (laptop): grey icon on white background.
+            // Tablet/mobile: black icon per editor request.
+            color: listening
+              ? '#ef4444'
+              : (style as any)?.color ?? '#94a3b8',
+            border: listening
+              ? '2px solid #ef4444'
+              : '2px solid transparent',
+            borderColor: listening
+              ? '#ef4444'
+              : (style as any)?.borderColor ?? 'transparent',
+            bgcolor: listening
+              ? 'rgba(239, 68, 68, 0.1)'
+              : (style as any)?.backgroundColor ?? 'rgba(255, 255, 255, 0.9)',
             backdropFilter: 'blur(8px)',
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             transition: 'all 0.15s ease',
             ...(listening ? { animation: 'dictation-pulse 1.2s ease-in-out infinite' } : {}),
             '&:hover': {
-              bgcolor: listening ? 'rgba(239, 68, 68, 0.2)' : '#ffffff',
-              color: listening ? '#ef4444' : '#2563eb',
+              bgcolor: listening
+                ? 'rgba(239, 68, 68, 0.2)'
+                : (style as any)?.backgroundColor ?? '#ffffff',
+              color: listening
+                ? '#ef4444'
+                : (style as any)?.color ?? '#2563eb',
               transform: 'scale(1.08)',
             },
             WebkitTapHighlightColor: 'transparent',
