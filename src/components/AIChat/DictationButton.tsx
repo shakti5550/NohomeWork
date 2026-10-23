@@ -6,6 +6,8 @@ import { SpeechRecognitionSession, isSpeechRecognitionSupported } from '../../se
 interface DictationButtonProps {
   /** Called with the finalized transcript and the canvas-CSS position where it should appear. */
   onDictate: (text: string, x: number, y: number) => void;
+  /** Called with the still-uncertain part of the transcript as you speak, so it can be rendered live. */
+  onInterim: (text: string, x: number, y: number) => void;
   /** Last known pointer position on the canvas (CSS px) — text is placed here. */
   lastPointerPos: { x: number; y: number } | null;
   style?: React.CSSProperties;
@@ -20,7 +22,7 @@ interface DictationButtonProps {
  * Uses the Web Speech API (SpeechRecognition) for live transcription and
  * falls back gracefully when the browser doesn't support it.
  */
-export const DictationButton: React.FC<DictationButtonProps> = ({ onDictate, lastPointerPos, style }) => {
+export const DictationButton: React.FC<DictationButtonProps> = ({ onDictate, onInterim, lastPointerPos, style }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [listening, setListening] = useState(false);
@@ -37,13 +39,15 @@ export const DictationButton: React.FC<DictationButtonProps> = ({ onDictate, las
     sessionRef.current = session;
 
     session.start({
-      onFinal: (text) => {
-        const trimmed = text.trim();
-        if (!trimmed) return;
+      // Finalized chunks are NOT committed here — committing each chunk
+      // separately at the same cursor position would stack them on top of
+      // each other. Instead the live overlay (onInterim) shows the full
+      // running transcript, and the whole thing is committed once on stop.
+      onFinal: () => {},
+      onInterim: (text) => {
         const pos = lastPointerPos ?? { x: 48, y: 60 };
-        onDictate(trimmed, pos.x, pos.y);
+        onInterim(text.trim(), pos.x, pos.y);
       },
-      onInterim: () => {},
       onError: (msg) => {
         // Only surface permission/network errors; transient ones auto-restart.
         if (msg.includes('not-allowed') || msg.includes('denied')) {

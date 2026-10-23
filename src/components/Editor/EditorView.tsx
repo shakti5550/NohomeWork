@@ -49,6 +49,11 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // Track pointer position for dictation
   const [lastPointerPos, setLastPointerPos] = useState<{ x: number; y: number } | null>(null);
 
+  // Live (interim) transcript — rendered on the canvas as you speak so text
+  // appears in real time instead of only when you tap stop. Cleared when a
+  // finalized sentence arrives or dictation ends.
+  const [interimAnnotation, setInterimAnnotation] = useState<TextAnnotation | null>(null);
+
   // AI chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(notebook.aiChat ?? []);
   const [chatInput, setChatInput] = useState('');
@@ -389,7 +394,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
     currentPage.strokes.forEach((stroke) => drawStroke(ctx, stroke));
     (currentPage.textAnnotations ?? []).forEach((ann) => drawTextAnnotation(ctx, ann, rect.width, rect.height));
-  }, [currentPage, pageMaxHeight, pageMaxWidth, isLandscape, template]);
+    if (interimAnnotation) drawTextAnnotation(ctx, interimAnnotation, rect.width, rect.height);
+  }, [currentPage, pageMaxHeight, pageMaxWidth, isLandscape, template, interimAnnotation]);
 
   const stopDrawing = () => {
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
@@ -506,6 +512,26 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     const updatedPages = [...nb.pages];
     updatedPages[idx] = { ...page, textAnnotations: [...(page.textAnnotations ?? []), ann] };
     updateCurrentNotebook(updatedPages);
+    // A finalized sentence is committed — clear the live interim so it
+    // doesn't double-render or linger on the next sentence.
+    setInterimAnnotation(null);
+  };
+
+  /** Renders the still-uncertain part of the transcript live on the canvas. */
+  const handleInterim = (text: string, x: number, y: number) => {
+    if (!text.trim()) {
+      setInterimAnnotation(null);
+      return;
+    }
+    setInterimAnnotation({
+      id: 'interim',
+      x, y,
+      text,
+      font: 'system-ui',
+      fontSize: width * 5 + 8,
+      color,
+      createdAt: Date.now(),
+    });
   };
 
   // ─── AI chat ──────────────────────────────────────────────────────────────
@@ -618,6 +644,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
       <DictationButton
         onDictate={handleDictate}
+        onInterim={handleInterim}
         lastPointerPos={lastPointerPos}
         style={{ bottom: 144, right: 16, backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff', color: mode === 'dark' ? '#f8fafc' : '#64748b', borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0' }}
       />
