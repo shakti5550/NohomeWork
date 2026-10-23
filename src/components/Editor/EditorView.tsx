@@ -549,6 +549,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         onClick={onClick}
         sx={{
           position: 'fixed',
+          boxSizing: 'border-box',
           width: 48,
           height: 48,
           borderRadius: '50%',
@@ -587,34 +588,32 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         style={{ top: 76, left: 16 }}
       />
 
-      {/* Add Page Button — top of right stack */}
+      {/* Right-side button stack — 48px buttons, 12px gaps, 16px from edges.
+          Order top→bottom: Add Page, Mic, AI Chat, Delete. */}
       <FloatingBtn
         onClick={handleAddPage}
         tooltip="Add Page"
         icon={<Plus size={20} />}
-        style={{ bottom: 180, right: 16 }}
+        style={{ bottom: 204, right: 16 }}
       />
 
-      {/* Floating dictation button — middle of right stack */}
       <DictationButton
         onDictate={handleDictate}
         lastPointerPos={lastPointerPos}
-        style={{ bottom: 120, right: 16, backgroundColor: '#ffffff', color: '#64748b', borderColor: '#e2e8f0' }}
+        style={{ bottom: 144, right: 16, backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff', color: mode === 'dark' ? '#f8fafc' : '#64748b', borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0' }}
       />
 
-      {/* Floating AI chat button — below mic */}
       <ChatButton
         onClick={() => setChatOpen((o) => !o)}
         isOpen={chatOpen}
-        style={{ bottom: 60, right: 16 }}
+        style={{ bottom: 84, right: 16 }}
       />
 
-      {/* Delete Page Button — bottom of right stack */}
       <FloatingBtn
         onClick={handleDeletePage}
         tooltip="Delete Page"
         icon={<Trash2 size={20} />}
-        style={{ bottom: 0, right: 16, color: '#ef4444', borderColor: '#fecaca' }}
+        style={{ bottom: 24, right: 16, color: '#ef4444', borderColor: '#fecaca' }}
       />
 
       {/* Pagination indicator */}

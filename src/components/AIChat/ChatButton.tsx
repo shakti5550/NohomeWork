@@ -25,10 +25,9 @@ export const ChatButton: React.FC<ChatButtonProps> = ({ onClick, isOpen, style }
         aria-label="AI chat"
         sx={{
           position: 'fixed',
-          right: { xs: 12, sm: 16 },
-          bottom: { xs: 12, sm: 16 },
-          width: { xs: 48, sm: 56 },
-          height: { xs: 48, sm: 56 },
+          boxSizing: 'border-box',
+          width: 48,
+          height: 48,
           borderRadius: '50%',
           zIndex: 1000,
           bgcolor: isOpen
@@ -43,9 +42,9 @@ export const ChatButton: React.FC<ChatButtonProps> = ({ onClick, isOpen, style }
             : mode === 'dark'
               ? '#f8fafc'
               : '#2563eb',
-          border: '2px solid',
-          borderColor: '#2563eb',
-          boxShadow: '0 6px 20px rgba(37, 99, 235, 0.35)',
+          border: '1px solid',
+          borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
           transition: 'all 0.2s ease',
           '&:hover': {
             transform: 'scale(1.08)',

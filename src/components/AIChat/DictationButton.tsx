@@ -89,11 +89,9 @@ export const DictationButton: React.FC<DictationButtonProps> = ({ onDictate, las
           aria-label={listening ? 'Stop dictation' : 'Start dictation'}
           sx={{
             position: 'fixed',
-            right: { xs: 12, sm: 16 },
-            // Sits directly above the AI chat button (which is 48/56px tall + 12/16px gap).
-            bottom: { xs: 72, sm: 88 },
-            width: { xs: 44, sm: 52 },
-            height: { xs: 44, sm: 52 },
+            boxSizing: 'border-box',
+            width: 48,
+            height: 48,
             borderRadius: '50%',
             zIndex: 999,
             color: listening ? '#ef4444' : '#94a3b8',
