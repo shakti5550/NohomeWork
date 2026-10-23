@@ -878,32 +878,48 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                 />
               ))}
               <Tooltip title="Color palette" placement="top">
-                <label style={{ cursor: 'pointer', display: 'inline-block' }}>
+                <Box
+                  sx={{
+                    position: 'relative',
+                    width: 36,
+                    height: 36,
+                    borderRadius: '50%',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    '&:focus-visible': {
+                      boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.5)'
+                    }
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #ff0000 0%, #ff8800 14%, #ffff00 28%, #00ff00 42%, #00ffff 57%, #0000ff 71%, #8800ff 85%, #ff00ff 100%)',
+                      border: '2px solid rgba(0,0,0,0.1)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                    }}
+                  />
                   <input
                     type="color"
                     value={color}
                     onChange={(e) => setColor(e.target.value)}
+                    aria-label="Custom color palette"
+                    tabIndex={0}
                     style={{
                       position: 'absolute',
-                      left: '-9999px',
-                      width: '1px',
-                      height: '1px',
-                      opacity: 0
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0,
+                      cursor: 'pointer',
+                      margin: 0,
+                      padding: 0
                     }}
                   />
-                  <Box
-                    sx={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #ff0000 0%, #ff8800 14%, #ffff00 28%, #00ff00 42%, #00ffff 57%, #0000ff 71%, #8800ff 85%, #ff00ff 100%)',
-                      border: '2px solid rgba(0,0,0,0.1)',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                      '&:hover': { transform: 'scale(1.1)' },
-                      transition: 'transform 0.15s ease'
-                    }}
-                  />
-                </label>
+                </Box>
               </Tooltip>
             </Box>
           </Box>
