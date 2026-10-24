@@ -740,7 +740,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                   position: 'fixed',
                   top: 15,
                   ...(i >= 4
-                    ? { right: `calc(16px + ${(5 - i)} * (48px + 12px))` }
+                    ? { right: `calc(16px + ${(5 - i)} * (48px + 12px))`, left: 'auto' }
                     : { left: `calc(16px + ${i} * (48px + 12px))` })
                 }}
               />
