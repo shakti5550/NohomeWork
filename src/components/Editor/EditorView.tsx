@@ -431,7 +431,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     currentPage.strokes.forEach((stroke) => drawStroke(ctx, stroke));
     (currentPage.textAnnotations ?? []).forEach((ann) => drawTextAnnotation(ctx, ann, rect.width, rect.height));
     if (interimAnnotation) drawTextAnnotation(ctx, interimAnnotation, rect.width, rect.height);
-  }, [currentPage, pageMaxHeight, pageMaxWidth, isLandscape, template, interimAnnotation]);
+  }, [currentPage, pageMaxHeight, pageMaxWidth, isLandscape, template, interimAnnotation, canvasAreaSize.width, canvasAreaSize.height]);
 
   const stopDrawing = () => {
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
@@ -844,6 +844,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             maxWidth: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px`
               : isTabletPortrait ? '96vw'
               : { xs: '98vw', sm: '94vw', md: '800px' },
+            height: isTabletPortrait ? '100%'
+              : isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px`
+              : undefined,
             maxHeight: isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px` : paperMaxHeight,
             aspectRatio: isLandscape ? `${landscapeRatioNum} / 1`
             : isTabletPortrait ? 'auto'
