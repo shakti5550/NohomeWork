@@ -111,7 +111,12 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // Top-row and bottom-strip layouts don't need this.
   // Stored as a pixel string: pl is a MUI spacing prop and would multiply
   // a raw number by the theme spacing factor (80 -> 640px).
-  const canvasLeftPad = (!isTabletPortrait && !isShortViewport) ? '24px' : '0px';
+  // iPad landscape gets more left clearance for its button stack; everything
+  // else keeps the existing spacing. Non-landscape layouts get 0 here since
+  // their button placement uses a different mechanism.
+  const canvasLeftPad = (!isTabletPortrait && !isShortViewport)
+    ? (isLandscape && isTabletMobile ? '40px' : '24px')
+    : '0px';
 
   // Tablet held vertically: the top button row sits just below the status bar,
   // so the canvas needs extra top padding to keep the paper clear of it.
