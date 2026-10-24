@@ -733,7 +733,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
               <Comp
                 key={`nhw-float-${i}`}
                 {...btn.props}
-                style={{ ...btn.props.style, position: 'fixed', top: 6, left: `calc(16px + ${i} * (48px + 12px))` }}
+                style={{ ...btn.props.style, position: 'fixed', top: 11, left: `calc(16px + ${i} * (48px + 12px))` }}
               />
             );
           })}
