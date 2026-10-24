@@ -134,7 +134,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // `pt: canvasTopPad` (undefined on non-tablet) would otherwise wipe out the
   // responsive top padding from `p` and let the paper overlap the controls.
   const canvasPadSide = isTabletMobile ? 0.25 : { xs: 0.25, sm: 0.5, md: 1 };
-  const canvasPadTop = isTabletPortrait ? '110px' : canvasPadSide;
+  const canvasPadTop = isTabletPortrait ? '96px' : canvasPadSide;
 
   // Notebook ref for callbacks
   const notebookRef = useRef(notebook);
@@ -733,7 +733,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                 <Comp
                   key={`nhw-float-${i}`}
                   {...btn.props}
-                  style={{ ...btn.props.style, position: 'fixed', top: 52, left: `calc(16px + ${i} * (48px + 12px))` }}
+                  style={{ ...btn.props.style, position: 'fixed', top: 48, left: `calc(16px + ${i} * (48px + 12px))` }}
                 />
               );
             })}
