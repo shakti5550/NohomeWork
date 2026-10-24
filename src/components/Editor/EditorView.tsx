@@ -825,7 +825,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           display: 'flex',
           justifyContent: isTabletPortrait ? 'flex-start'
             : (!isTabletPortrait && !isShortViewport) ? 'flex-end' : 'center',
-          alignItems: 'center',
+          alignItems: isTabletPortrait ? 'flex-start' : 'center',
           py: canvasPadSide,
           pt: canvasPadTop,
           pl: canvasLeftPad,
