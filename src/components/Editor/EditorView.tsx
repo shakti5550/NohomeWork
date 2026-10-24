@@ -106,6 +106,11 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // the status bar and the top of the paper, in the same left-to-right order.
   const isTabletPortrait = useMediaQuery('(min-width: 768px) and (max-width: 1024px) and (orientation: portrait)');
 
+  // When the vertical left stack is active it occupies 16..64px, so the paper
+  // shifts right to keep its margin clear of the buttons. Top-row and bottom
+  // strip layouts don't need this.
+  const paperLeftShift = (!isTabletPortrait && !isShortViewport) ? 80 : 0;
+
   const landscapeRatioNum = isLandscape
     ? Math.max(1.25, Math.min(availWidth / Math.max(1, availHeight), 1.6))
     : 1.25;
@@ -810,6 +815,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             overflow: 'hidden',
             bgcolor: mode === 'dark' ? '#1e293b' : '#fff',
             position: 'relative',
+            ml: paperLeftShift,
             width: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : '100%',
             maxWidth: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : { xs: '98vw', sm: '94vw', md: '800px' },
             maxHeight: isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px` : paperMaxHeight,
