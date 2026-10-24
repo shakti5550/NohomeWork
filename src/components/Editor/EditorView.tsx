@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import {
   ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight,
-  Bot, X, Send, Pencil
+  Bot, X, Send, Pencil, Hand
 } from 'lucide-react';
 import { Notebook, Page, Stroke, TextAnnotation, saveNotebook, ChatMessage } from '../../storage/cloud';
 import { ChatButton } from '../AIChat/ChatButton';
@@ -40,6 +40,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const [toolDialogOpen, setToolDialogOpen] = useState(false);
   const [paginationVisible, setPaginationVisible] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [panning, setPanning] = useState(false);
 
   // Pagination state
   const paginationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,6 +67,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const activePointerIdRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasAreaRef = useRef<HTMLDivElement | null>(null);
+  const panStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isPanningActiveRef = useRef(false);
+  const paperRef = useRef<HTMLDivElement | null>(null);
 
   const currentPage: Page = notebook.pages[currentPageIndex] || notebook.pages[0];
 
@@ -439,6 +443,12 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   }, [currentPage, pageMaxHeight, pageMaxWidth, isLandscape, template, interimAnnotation, canvasAreaSize.width, canvasAreaSize.height]);
 
   const stopDrawing = () => {
+    // Panning mode — just release the pan
+    if (panning) {
+      panStartRef.current = null;
+      isPanningActiveRef.current = false;
+      return;
+    }
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
     isDrawingRef.current = false;
     activePointerIdRef.current = null;
@@ -460,6 +470,12 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     try {
       canvas.setPointerCapture(e.pointerId);
     } catch { }
+    // Panning mode — move paper instead of drawing
+    if (panning) {
+      panStartRef.current = { x: e.clientX, y: e.clientY };
+      isPanningActiveRef.current = true;
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -483,6 +499,15 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   };
 
   const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // Panning mode — move the paper
+    if (panning && panStartRef.current) {
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      if (paperRef.current) {
+        paperRef.current.style.transform = `translate(${dx}px, ${dy}px)`;
+      }
+      return;
+    }
     if (!isDrawingRef.current || !currentStrokeRef.current) return;
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
     const canvas = canvasRef.current;
@@ -696,6 +721,18 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       },
     },
     {
+      comp: FloatingBtn,
+      props: {
+        onClick: () => setPanning(p => !p),
+        tooltip: panning ? 'Disable Panning' : 'Enable Panning',
+        icon: <Hand size={20} />,
+        style: {
+          top: 256, left: 6,
+          ...(panning ? { bgcolor: '#2563eb', color: '#fff', borderColor: '#3b82f6' } : {}),
+        },
+      },
+    },
+    {
       comp: DictationButton,
       props: {
         onDictate: handleDictate,
@@ -739,8 +776,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                   ...btn.props.style,
                   position: 'fixed',
                   top: 15,
-                  ...(i >= 4
-                    ? { right: `calc(16px + ${(5 - i)} * (48px + 12px))`, left: 'auto' }
+                  ...(i >= floatButtons.length - 2
+                    ? { right: `calc(16px + ${(floatButtons.length - 1 - i)} * (48px + 12px))`, left: 'auto' }
                     : { left: `calc(16px + ${i} * (48px + 12px))` })
                 }}
               />
@@ -843,6 +880,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         }}
       >
         <Box
+          ref={paperRef}
           sx={{
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
             borderRadius: 2,
@@ -873,7 +911,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
               width: '100%',
               height: '100%',
               display: 'block',
-              cursor: tool === 'eraser' ? 'cell' : 'crosshair',
+              cursor: panning ? (isPanningActiveRef.current ? 'grabbing' : 'grab')
+                : tool === 'eraser' ? 'cell' : 'crosshair',
               touchAction: 'none',
               userSelect: 'none',
               WebkitUserSelect: 'none',
