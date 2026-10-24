@@ -845,7 +845,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
               : isTabletPortrait ? '96vw'
               : { xs: '98vw', sm: '94vw', md: '800px' },
             maxHeight: isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px` : paperMaxHeight,
-            aspectRatio: isLandscape ? `${landscapeRatioNum} / 1` : '4 / 5',
+            aspectRatio: isLandscape ? `${landscapeRatioNum} / 1`
+            : isTabletPortrait ? 'auto'
+            : '4 / 5',
           }}
         >
           <canvas
