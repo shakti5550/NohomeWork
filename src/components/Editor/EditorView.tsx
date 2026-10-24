@@ -106,10 +106,12 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // the status bar and the top of the paper, in the same left-to-right order.
   const isTabletPortrait = useMediaQuery('(min-width: 768px) and (max-width: 1024px) and (orientation: portrait)');
 
-  // When the vertical left stack is active it occupies 16..64px, so the paper
-  // shifts right to keep its margin clear of the buttons. Top-row and bottom
-  // strip layouts don't need this.
-  const paperLeftShift = (!isTabletPortrait && !isShortViewport) ? 80 : 0;
+  // When the vertical left stack is active it occupies 16..64px, so the canvas
+  // container gets left padding to keep the paper clear of the buttons.
+  // Top-row and bottom-strip layouts don't need this.
+  // Stored as a pixel string: pl is a MUI spacing prop and would multiply
+  // a raw number by the theme spacing factor (80 -> 640px).
+  const canvasLeftPad = (!isTabletPortrait && !isShortViewport) ? '80px' : '0px';
 
   const landscapeRatioNum = isLandscape
     ? Math.max(1.25, Math.min(availWidth / Math.max(1, availHeight), 1.6))
@@ -807,7 +809,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       )}
 
       {/* Canvas Area */}
-      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: canvasPadding, overflow: 'hidden' }}>
+      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: canvasPadding, pl: canvasLeftPad, overflow: 'hidden' }}>
         <Box
           sx={{
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
@@ -815,7 +817,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             overflow: 'hidden',
             bgcolor: mode === 'dark' ? '#1e293b' : '#fff',
             position: 'relative',
-            ml: paperLeftShift,
             width: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : '100%',
             maxWidth: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : { xs: '98vw', sm: '94vw', md: '800px' },
             maxHeight: isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px` : paperMaxHeight,
