@@ -841,7 +841,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             bgcolor: mode === 'dark' ? '#1e293b' : '#fff',
             position: 'relative',
             width: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : '100%',
-            maxWidth: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : { xs: '98vw', sm: '94vw', md: '800px' },
+            maxWidth: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px`
+              : isTabletPortrait ? '96vw'
+              : { xs: '98vw', sm: '94vw', md: '800px' },
             maxHeight: isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px` : paperMaxHeight,
             aspectRatio: isLandscape ? `${landscapeRatioNum} / 1` : '4 / 5',
           }}
