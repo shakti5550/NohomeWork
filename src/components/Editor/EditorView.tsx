@@ -113,6 +113,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // a raw number by the theme spacing factor (80 -> 640px).
   const canvasLeftPad = (!isTabletPortrait && !isShortViewport) ? '24px' : '0px';
 
+  // Tablet held vertically: the top button row sits just below the status bar,
+  // so the canvas needs extra top padding to keep the paper clear of it.
   const landscapeRatioNum = isLandscape
     ? Math.max(1.25, Math.min(availWidth / Math.max(1, availHeight), 1.6))
     : 1.25;
@@ -125,9 +127,14 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // top space is used. Laptop keeps the existing behavior.
   const paperMaxHeight = isLandscape && pageMaxHeight > 0
     ? `${pageMaxHeight}px`
+    : isTabletPortrait ? '100%'
     : isTabletMobile ? '96vh'
     : { xs: '82vh', sm: '88vh', md: 'none' };
-  const canvasPadding = isTabletMobile ? 0.25 : { xs: 0.25, sm: 0.5, md: 1 };
+  // Decomposed into explicit side paddings. `pt` must always have a value:
+  // `pt: canvasTopPad` (undefined on non-tablet) would otherwise wipe out the
+  // responsive top padding from `p` and let the paper overlap the controls.
+  const canvasPadSide = isTabletMobile ? 0.25 : { xs: 0.25, sm: 0.5, md: 1 };
+  const canvasPadTop = isTabletPortrait ? '110px' : canvasPadSide;
 
   // Notebook ref for callbacks
   const notebookRef = useRef(notebook);
@@ -818,7 +825,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           display: 'flex',
           justifyContent: (!isTabletPortrait && !isShortViewport) ? 'flex-end' : 'center',
           alignItems: 'center',
-          p: canvasPadding,
+          py: canvasPadSide,
+          pt: canvasPadTop,
           pl: canvasLeftPad,
           pr: (!isTabletPortrait && !isShortViewport) ? '16px' : undefined,
           overflow: 'hidden',
