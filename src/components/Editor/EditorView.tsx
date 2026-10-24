@@ -128,8 +128,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const paperMaxHeight = isLandscape && pageMaxHeight > 0
     ? `${pageMaxHeight}px`
     : isTabletPortrait ? '100%'
-    : isTabletMobile ? '96vh'
-    : { xs: '82vh', sm: '88vh', md: 'none' };
+      : isTabletMobile ? '96vh'
+        : { xs: '82vh', sm: '88vh', md: 'none' };
   // Decomposed into explicit side paddings. `pt` must always have a value:
   // `pt: canvasTopPad` (undefined on non-tablet) would otherwise wipe out the
   // responsive top padding from `p` and let the paper overlap the controls.
@@ -454,7 +454,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     e.preventDefault();
     try {
       canvas.setPointerCapture(e.pointerId);
-    } catch {}
+    } catch { }
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -723,63 +723,63 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           16px from the left edge. Order top→bottom:
           Back → Tools → Add Page → Delete → Mic → AI Chat. */}
       {isTabletPortrait ? (
-          // Tablet held vertically: a horizontal top row keeps the controls
-          // clear of the status bar and the top of the paper, in the same
-          // left-to-right order. Each button keeps its own colors.
-          <Box className="nhw-float-row" sx={{ position: 'fixed', top: 0, left: 0, right: 0, display: 'flex', gap: 1, p: 1, bgcolor: 'background.default', opacity: 0.97, zIndex: 100 }}>
-            {floatButtons.map((btn, i) => {
-              const Comp = btn.comp;
-              return (
-                <Comp
-                  key={`nhw-float-${i}`}
-                  {...btn.props}
-                  style={{ ...btn.props.style, position: 'fixed', top: 32, left: `calc(16px + ${i} * (48px + 12px))` }}
-                />
-              );
-            })}
-          </Box>
-        ) : isShortViewport ? (
-          // Short viewports: a wrapping bottom strip. flexWrap keeps every
-          // control reachable even when the viewport is both short and narrow.
-          // Each button keeps its own colors — only position is overridden.
-          <Box
-            className="nhw-float-row"
-            sx={{
-              position: 'fixed',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 1,
-              p: 1,
-              bgcolor: 'background.default',
-              opacity: 0.97,
-              zIndex: 100,
-              overflowX: 'auto',
-            }}
-          >
-            {floatButtons.map((btn, i) => {
-              const Comp = btn.comp;
-              return (
-                <Comp
-                  key={`nhw-float-${i}`}
-                  {...btn.props}
-                  style={{ ...btn.props.style, position: 'static', flex: '0 0 auto' }}
-                />
-              );
-            })}
-          </Box>
-        ) : (
-          <div className="nhw-float-stack" data-side="left">
-            {floatButtons.map((btn, i) => {
-              const Comp = btn.comp;
-              return (
-                <Comp key={`nhw-float-${i}`} {...btn.props} />
-              );
-            })}
-          </div>
-        )}
+        // Tablet held vertically: a horizontal top row keeps the controls
+        // clear of the status bar and the top of the paper, in the same
+        // left-to-right order. Each button keeps its own colors.
+        <Box className="nhw-float-row" sx={{ position: 'fixed', top: 0, left: 0, right: 0, display: 'flex', gap: 1, p: 1, bgcolor: 'background.default', opacity: 0.97, zIndex: 100 }}>
+          {floatButtons.map((btn, i) => {
+            const Comp = btn.comp;
+            return (
+              <Comp
+                key={`nhw-float-${i}`}
+                {...btn.props}
+                style={{ ...btn.props.style, position: 'fixed', top: 25, left: `calc(16px + ${i} * (48px + 12px))` }}
+              />
+            );
+          })}
+        </Box>
+      ) : isShortViewport ? (
+        // Short viewports: a wrapping bottom strip. flexWrap keeps every
+        // control reachable even when the viewport is both short and narrow.
+        // Each button keeps its own colors — only position is overridden.
+        <Box
+          className="nhw-float-row"
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 1,
+            p: 1,
+            bgcolor: 'background.default',
+            opacity: 0.97,
+            zIndex: 100,
+            overflowX: 'auto',
+          }}
+        >
+          {floatButtons.map((btn, i) => {
+            const Comp = btn.comp;
+            return (
+              <Comp
+                key={`nhw-float-${i}`}
+                {...btn.props}
+                style={{ ...btn.props.style, position: 'static', flex: '0 0 auto' }}
+              />
+            );
+          })}
+        </Box>
+      ) : (
+        <div className="nhw-float-stack" data-side="left">
+          {floatButtons.map((btn, i) => {
+            const Comp = btn.comp;
+            return (
+              <Comp key={`nhw-float-${i}`} {...btn.props} />
+            );
+          })}
+        </div>
+      )}
 
       {/* Pagination indicator */}
       {paginationVisible && (
@@ -843,14 +843,14 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             width: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : '100%',
             maxWidth: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px`
               : isTabletPortrait ? '96vw'
-              : { xs: '98vw', sm: '94vw', md: '800px' },
+                : { xs: '98vw', sm: '94vw', md: '800px' },
             height: isTabletPortrait ? '100%'
               : isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px`
-              : undefined,
+                : undefined,
             maxHeight: isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px` : paperMaxHeight,
             aspectRatio: isLandscape ? `${landscapeRatioNum} / 1`
-            : isTabletPortrait ? 'auto'
-            : '4 / 5',
+              : isTabletPortrait ? 'auto'
+                : '4 / 5',
           }}
         >
           <canvas
