@@ -115,7 +115,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // else keeps the existing spacing. Non-landscape layouts get 0 here since
   // their button placement uses a different mechanism.
   const canvasLeftPad = (!isTabletPortrait && !isShortViewport)
-    ? (isLandscape && isTabletMobile ? '40px' : '24px')
+    ? (isLandscape && isTabletMobile ? '60px' : '24px')
     : '0px';
 
   // Tablet held vertically: the top button row sits just below the status bar,
