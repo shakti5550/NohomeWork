@@ -702,7 +702,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         onInterim: handleInterim,
         lastPointerPos: lastPointerPos,
         style: {
-          top: 256, left: 6,
+          bottom: 16, left: 6,
           backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff',
           color: mode === 'dark' ? '#f8fafc' : '#64748b',
           borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
@@ -714,7 +714,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       props: {
         onClick: () => setChatOpen((o) => !o),
         isOpen: chatOpen,
-        style: { top: 316, left: 6 },
+        style: { bottom: 76, left: 6 },
       },
     },
   ];
