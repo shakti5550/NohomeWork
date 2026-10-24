@@ -809,7 +809,21 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       )}
 
       {/* Canvas Area */}
-      <Box ref={canvasAreaRef} sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', p: canvasPadding, pl: canvasLeftPad, overflow: 'hidden' }}>
+      {/* Laptop/tall screens: push the paper toward the right edge so it clears
+            the left button stack without shrinking. Other layouts stay centered. */}
+      <Box
+        ref={canvasAreaRef}
+        sx={{
+          flex: 1,
+          display: 'flex',
+          justifyContent: (!isTabletPortrait && !isShortViewport) ? 'flex-end' : 'center',
+          alignItems: 'center',
+          p: canvasPadding,
+          pl: canvasLeftPad,
+          pr: (!isTabletPortrait && !isShortViewport) ? '16px' : undefined,
+          overflow: 'hidden',
+        }}
+      >
         <Box
           sx={{
             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
