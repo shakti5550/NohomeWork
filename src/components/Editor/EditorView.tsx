@@ -111,7 +111,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // Top-row and bottom-strip layouts don't need this.
   // Stored as a pixel string: pl is a MUI spacing prop and would multiply
   // a raw number by the theme spacing factor (80 -> 640px).
-  const canvasLeftPad = (!isTabletPortrait && !isShortViewport) ? '80px' : '0px';
+  const canvasLeftPad = (!isTabletPortrait && !isShortViewport) ? '24px' : '0px';
 
   const landscapeRatioNum = isLandscape
     ? Math.max(1.25, Math.min(availWidth / Math.max(1, availHeight), 1.6))
