@@ -660,7 +660,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         onClick: handleBack,
         tooltip: 'Back to Library',
         icon: <ArrowLeft size={20} />,
-        style: { top: 16, left: 9 },
+        style: { top: 16, left: 6 },
       },
     },
     {
@@ -669,7 +669,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         onClick: () => setToolDialogOpen(true),
         tooltip: 'Tools & Settings',
         icon: <Pencil size={20} />,
-        style: { top: 76, left: 9 },
+        style: { top: 76, left: 6 },
       },
     },
     {
@@ -678,7 +678,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         onClick: handleAddPage,
         tooltip: 'Add Page',
         icon: <Plus size={20} />,
-        style: { top: 136, left: 9 },
+        style: { top: 136, left: 6 },
       },
     },
     {
@@ -687,7 +687,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         onClick: handleDeletePage,
         tooltip: 'Delete Page',
         icon: <Trash2 size={20} />,
-        style: { top: 196, left: 9, color: '#ef4444', borderColor: '#fecaca' },
+        style: { top: 196, left: 6, color: '#ef4444', borderColor: '#fecaca' },
       },
     },
     {
@@ -697,7 +697,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         onInterim: handleInterim,
         lastPointerPos: lastPointerPos,
         style: {
-          top: 256, left: 9,
+          top: 256, left: 6,
           backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff',
           color: mode === 'dark' ? '#f8fafc' : '#64748b',
           borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
@@ -709,7 +709,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       props: {
         onClick: () => setChatOpen((o) => !o),
         isOpen: chatOpen,
-        style: { top: 316, left: 9 },
+        style: { top: 316, left: 6 },
       },
     },
   ];
