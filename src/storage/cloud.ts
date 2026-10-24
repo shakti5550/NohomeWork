@@ -46,6 +46,7 @@ export interface Notebook {
   title: string;
   createdAt: number;
   updatedAt: number;
+  created_date?: string;
   coverColor: string;
   coverStyle: 'minimal' | 'classic' | 'grid';
   pages: Page[];
@@ -149,6 +150,7 @@ export async function getAllNotebooks(): Promise<Notebook[]> {
     title: row.title,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    created_date: row.created_date,
     coverColor: row.cover_color,
     coverStyle: row.cover_style as Notebook['coverStyle'],
     version: row.version,
@@ -188,6 +190,7 @@ export async function getNotebook(id: string): Promise<Notebook | undefined> {
     title: row.title,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    created_date: row.created_date,
     coverColor: row.cover_color,
     coverStyle: row.cover_style as Notebook['coverStyle'],
     version: row.version,
@@ -234,6 +237,12 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
 
   const now = Date.now();
 
+  // created_date is a plain text column (YYYY-MM-DD), not a generated one,
+  // so derive it lazily here rather than relying on the caller to set it.
+  const created_date =
+    notebook.created_date ??
+    (notebook.createdAt ? new Date(notebook.createdAt).toISOString().slice(0, 10) : null);
+
   const { error: nbErr } = await supabase.from('notebooks').upsert({
     id: notebookId,
     user_id: user.id,
@@ -241,6 +250,7 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
     cover_color: notebook.coverColor,
     cover_style: notebook.coverStyle,
     created_at: notebook.createdAt,
+    created_date,
     updated_at: now,
     version: newVersion,
     ai_chat: notebook.aiChat ?? [],
@@ -289,6 +299,7 @@ export async function createDefaultNotebook(title: string = 'Untitled Notebook')
     title,
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    created_date: new Date().toISOString().slice(0, 10),
     coverColor: '#1976d2',
     coverStyle: 'classic',
     pages: [
@@ -303,4 +314,54 @@ export async function createDefaultNotebook(title: string = 'Untitled Notebook')
   };
   await saveNotebook(newNotebook);
   return newNotebook;
+}
+
+// ─── Folders ──────────────────────────────────────────────────────────────
+
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  created_date?: string;
+}
+
+export async function createFolder(name: string): Promise<Folder> {
+  const now = Date.now();
+  const folder: Folder = {
+    id: 'fld_' + Math.random().toString(36).substring(2, 9),
+    name,
+    createdAt: now,
+    updatedAt: now,
+    created_date: new Date().toISOString().slice(0, 10),
+  };
+  const { error } = await supabase.from('folders').insert(folder);
+  if (error) throw error;
+  return folder;
+}
+
+export async function getFolders(): Promise<Folder[]> {
+  ensureSignedIn();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data: rows, error } = await supabase
+    .from('folders')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (rows ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    created_date: r.created_date,
+  }));
+}
+
+export async function deleteFolder(id: string): Promise<void> {
+  ensureSignedIn();
+  // notebook_folders rows are deleted via ON DELETE CASCADE
+  const { error } = await supabase.from('folders').delete().eq('id', id);
+  if (error) throw error;
 }

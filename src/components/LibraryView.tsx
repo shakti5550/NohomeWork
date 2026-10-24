@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
-  Typography, Button, IconButton, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, Card, Divider, Alert, useMediaQuery, useTheme
+  Typography, Button, IconButton, Menu as MuiMenu, MenuItem, Dialog, DialogTitle,
+  DialogContent, DialogActions, TextField, Card, Divider, Alert, useMediaQuery,
+  useTheme
 } from '@mui/material';
 import {
-  BookOpen, Plus, Trash2, Star, Folder, Search, Menu, X
+  BookOpen, Plus, Trash2, Star, Folder, Search, Menu as MenuIcon, X, MoreVertical, Download
 } from 'lucide-react';
-import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook } from '../storage/cloud';
+import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook, createFolder, getFolders, deleteFolder } from '../storage/cloud';
 import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
@@ -28,6 +29,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
   const [newTitle, setNewTitle] = useState('Untitled Notebook');
   const [coverColor, setCoverColor] = useState('#1976d2');
   const [error, setError] = useState<string | null>(null);
+  // Per-notebook menu (the ⋮ icon replacing the old delete button on each tile)
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [menuNotebookId, setMenuNotebookId] = useState<string | null>(null);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
 
   const loadNotebooks = async () => {
     try {
@@ -56,12 +61,68 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
     loadNotebooks();
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this notebook?')) {
       await deleteNotebook(id);
       loadNotebooks();
     }
+  };
+
+  // Open the ⋮ menu for a given notebook tile
+  const handleMenuOpen = (e: React.MouseEvent<HTMLElement>, id: string) => {
+    e.stopPropagation();
+    setMenuAnchor(e.currentTarget);
+    setMenuNotebookId(id);
+  };
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+    setMenuNotebookId(null);
+  };
+
+  // Export: download this notebook as a JSON file to the local machine.
+  // The shape matches what an import would expect to read back.
+  const handleExport = (id: string) => {
+    handleMenuClose();
+    const nb = notebooks.find((n) => n.id === id);
+    if (!nb) {
+      setImportNotice('Notebook not found.');
+      return;
+    }
+    try {
+      const payload = JSON.stringify({
+        id: nb.id,
+        title: nb.title,
+        coverColor: nb.coverColor,
+        coverStyle: nb.coverStyle,
+        createdAt: nb.createdAt,
+        updatedAt: nb.updatedAt,
+        pages: nb.pages,
+        aiChat: nb.aiChat ?? [],
+      });
+      const blob = new Blob([payload], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${nb.title.replace(/[^a-z0-9_-]/gi, '_').toLowerCase() || 'notebook'}.nohomework.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setImportNotice('Notebook exported.');
+    } catch (err: any) {
+      setImportNotice(err.message || 'Export failed');
+    }
+  };
+
+  // Favourite / folder actions are not wired up yet — surface a notice so the
+  // UI is ready for the dedicated screens when they land.
+  const handleFavourite = () => {
+    handleMenuClose();
+    setImportNotice('Favorites screen coming soon.');
+  };
+  const handleAddToFolder = () => {
+    handleMenuClose();
+    setImportNotice('Folders screen coming soon.');
   };
 
   const filteredNotebooks = notebooks.filter(nb =>
@@ -159,6 +220,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             {error}
           </Alert>
         )}
+        {importNotice && (
+          <Alert severity="info" sx={{ mb: 2 }} onClose={() => setImportNotice(null)}>
+            {importNotice}
+          </Alert>
+        )}
         <Box sx={{ mb: 4 }}>
           {/* Desktop: single row — title left, search bar middle, profile icon right.
               Mobile/tablet: two rows — title+profile on top, full-width search below. */}
@@ -179,7 +245,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             }}>
               {isMobile && (
                 <IconButton onClick={() => setIsSidebarOpen(true)} sx={{ mr: 1 }} color="inherit">
-                  <Menu size={24} />
+                  <MenuIcon size={24} />
                 </IconButton>
               )}
               <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Documents</Typography>
@@ -309,22 +375,64 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
                   </Typography>
                 </Box>
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, mt: 'auto' }}>
                   <Typography variant="caption" sx={{ opacity: 0.9 }}>
                     {nb.pages.length} pages
                   </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                    {nb.created_date ?? new Date(nb.createdAt).toLocaleDateString()}
+                  </Typography>
                   <IconButton
                     size="small"
-                    onClick={(e) => handleDelete(e, nb.id)}
+                    onClick={(e) => handleMenuOpen(e, nb.id)}
+                    aria-label="Notebook options"
+                    aria-controls={menuNotebookId === nb.id ? 'notebook-menu' : undefined}
+                    aria-expanded={menuNotebookId === nb.id}
                     sx={{ color: '#fff', opacity: 0.7, '&:hover': { opacity: 1, bgcolor: 'rgba(255,255,255,0.2)' } }}
                   >
-                    <Trash2 size={16} />
+                    <MoreVertical size={16} />
                   </IconButton>
                 </Box>
               </Box>
             </Card>
           ))}
         </Box>
+
+        {/* Per-notebook menu (⋮) — replaces the old per-tile delete button */}
+        <MuiMenu
+          id="notebook-menu"
+          anchorEl={menuAnchor}
+          open={Boolean(menuAnchor)}
+          onClose={handleMenuClose}
+          MenuListProps={{
+            'aria-labelledby': 'notebook-menu-label',
+            onClick: (e) => e.stopPropagation(),
+          }}
+          PaperProps={{ sx: { borderRadius: 2, mt: 1, minWidth: 180 } }}
+        >
+          <MenuItem onClick={() => menuNotebookId && handleExport(menuNotebookId)}>
+            <Box sx={{ mr: 1, color: 'text.secondary' }}><Download size={18} /></Box>
+            Export
+          </MenuItem>
+          <MenuItem onClick={handleFavourite}>
+            <Box sx={{ mr: 1, color: 'text.secondary' }}><Star size={18} /></Box>
+            Mark as favourite
+          </MenuItem>
+          <MenuItem onClick={handleAddToFolder}>
+            <Box sx={{ mr: 1, color: 'text.secondary' }}><Folder size={18} /></Box>
+            Add to a folder
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
+              handleMenuClose();
+              if (menuNotebookId) handleDelete(menuNotebookId);
+            }}
+            sx={{ color: 'error.main' }}
+          >
+            <Box sx={{ mr: 1 }}><Trash2 size={18} /></Box>
+            Delete
+          </MenuItem>
+        </MuiMenu>
       </Box>
 
       {/* New Notebook Dialog */}
