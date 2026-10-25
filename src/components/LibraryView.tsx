@@ -172,7 +172,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton sx={{ borderRadius: 2, color: 'text.secondary' }}>
+          <ListItemButton
+            onClick={() => navigate('/Folders')}
+            sx={{ borderRadius: 2, color: 'text.secondary' }}
+          >
             <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><Folder size={20} /></ListItemIcon>
             <ListItemText primary="Folders" />
           </ListItemButton>

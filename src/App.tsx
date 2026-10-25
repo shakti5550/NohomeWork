@@ -4,6 +4,7 @@ import {
   useParams
 } from 'react-router-dom';
 import { LibraryView } from './components/LibraryView';
+import { FoldersView } from './components/FoldersView';
 import { EditorView } from './components/Editor/EditorView';
 import { Notebook, getNotebook } from './storage/cloud';
 import { AuthPage } from './components/Auth/AuthPage';
@@ -63,6 +64,11 @@ const AppContent: React.FC = () => {
       <Route path="/Home" element={
         <AuthGuard>
           <LibraryView onOpenNotebook={(id) => navigate('/Editor/' + id)} onSignOut={handleSignOut} />
+        </AuthGuard>
+      } />
+      <Route path="/Folders" element={
+        <AuthGuard>
+          <FoldersView onSignOut={handleSignOut} />
         </AuthGuard>
       } />
       <Route path="/Editor/:id" element={
