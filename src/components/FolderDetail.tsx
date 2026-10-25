@@ -3,15 +3,13 @@ import {
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   Typography, Button, IconButton, Menu as MuiMenu, MenuItem, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Card, Alert, useMediaQuery, useTheme,
-  Skeleton, CircularProgress, Checkbox
+  Skeleton, CircularProgress
 } from '@mui/material';
 import {
-  BookOpen, Plus, Trash2, Folder as FolderIcon, Search, Menu as MenuIcon,
-  X, MoreVertical, Download, ArrowLeft
+  BookOpen, Plus, Trash2, Folder as FolderIcon, Search, X, MoreVertical, Download, ArrowLeft
 } from 'lucide-react';
 import {
   Notebook,
-  loadNotebooks as loadCloudNotebooks,
   deleteNotebook,
   createFolder,
   getFolders,
@@ -24,6 +22,7 @@ import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
 import { useNavigate } from 'react-router-dom';
+import { Toast } from './Toast';
 
 interface FolderDetailProps {
   folderId: string;
@@ -48,7 +47,6 @@ export const FolderDetail: React.FC<FolderDetailProps> = ({ folderId, onSignOut 
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [foldersList, setFoldersList] = useState<any[]>([]);
   const [foldersLoading, setFoldersLoading] = useState(false);
-  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
 
   // Fetch folder and its notebooks
   useEffect(() => {
@@ -277,9 +275,7 @@ export const FolderDetail: React.FC<FolderDetailProps> = ({ folderId, onSignOut 
           </Alert>
         )}
         {importNotice && (
-          <Alert severity="info" sx={{ mb: 2 }} onClose={() => setImportNotice(null)}>
-            {importNotice}
-          </Alert>
+          <Toast message={importNotice} severity="info" onClose={() => setImportNotice(null)} />
         )}
 
         {/* Breadcrumb header */}

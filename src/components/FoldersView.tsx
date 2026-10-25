@@ -12,6 +12,7 @@ import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
 import { useNavigate } from 'react-router-dom';
+import { Toast } from './Toast';
 
 interface FoldersViewProps {
   onSignOut: () => void;
@@ -28,6 +29,7 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('Untitled Folder');
   const [error, setError] = useState<string | null>(null);
+  const [importNotice, setImportNotice] = useState<{ message: string; severity?: 'info' | 'success' | 'warning' | 'error' } | null>(null);
 
   const loadFolders = async () => {
     try {
@@ -53,8 +55,9 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
       setNewDialogOpen(false);
       setNewTitle('Untitled Folder');
       loadFolders();
+      setImportNotice({ message: 'Folder created successfully.', severity: 'success' });
     } catch (err: any) {
-      setError(err.message || 'Failed to create folder');
+      setImportNotice({ message: err.message || 'Failed to create folder', severity: 'error' });
     }
   };
 
@@ -63,8 +66,9 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
       try {
         await deleteFolder(id);
         loadFolders();
+        setImportNotice({ message: 'Folder deleted.', severity: 'success' });
       } catch (err: any) {
-        setError(err.message || 'Failed to delete folder');
+        setImportNotice({ message: err.message || 'Failed to delete folder', severity: 'error' });
       }
     }
   };
@@ -121,7 +125,7 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
             }
           }}>
             <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><FolderIcon size={20} /></ListItemIcon>
-            <ListItemText primary="Folders" primaryTypographyProps={{ fontWeight: 600 }} />
+            <ListItemText primary="Folders" />
           </ListItemButton>
         </ListItem>
       </List>
@@ -166,6 +170,9 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
           }>
             {error}
           </Alert>
+        )}
+        {importNotice && (
+          <Toast message={importNotice.message} severity={importNotice.severity || 'info'} onClose={() => setImportNotice(null)} />
         )}
         <Box sx={{ mb: 4 }}>
           <Box sx={{

@@ -13,6 +13,7 @@ import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
 import { useNavigate } from 'react-router-dom';
+import { Toast } from './Toast';
 
 interface LibraryViewProps {
   onOpenNotebook: (notebookId: string) => void;
@@ -328,9 +329,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
           </Alert>
         )}
         {importNotice && (
-          <Alert severity="info" sx={{ mb: 2 }} onClose={() => setImportNotice(null)}>
-            {importNotice}
-          </Alert>
+          <Toast message={importNotice} severity="info" onClose={() => setImportNotice(null)} />
         )}
         <Box sx={{ mb: 4 }}>
           {/* Desktop: single row — title left, search bar middle, profile icon right.
