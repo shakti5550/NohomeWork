@@ -307,7 +307,6 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
                   width: '100%',
                   border: '1px solid transparent',
                   transition: 'background-color 0.2s, border-color 0.2s, box-shadow 0.2s',
-                  position: 'relative',
                   '&:hover': {
                     bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.15)' : 'rgba(37, 99, 235, 0.05)',
                     borderColor: mode === 'dark' ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.3)',
@@ -320,8 +319,8 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
                   onClick={() => navigate('/Folders/' + folder.id)}
                   aria-label={`Open folder ${folder.name}`}
                   sx={{
-                    position: 'absolute',
-                    inset: 0,
+                    flex: 1,
+                    minWidth: 0,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 2,
@@ -333,7 +332,6 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
                     textAlign: 'left',
                     padding: 0,
                     borderRadius: 1,
-                    margin: -2,
                     '&:focus-visible': {
                       outline: '2px solid',
                       outlineColor: mode === 'dark' ? '#60a5fa' : '#1d4ed8',
@@ -376,6 +374,7 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
                   }}
                   sx={{
                     color: 'text.secondary',
+                    flexShrink: 0,
                     '&:hover': {
                       bgcolor: 'error.light',
                       color: 'error.contrastText'
