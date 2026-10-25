@@ -161,6 +161,7 @@ export async function getAllNotebooks(): Promise<Notebook[]> {
       template: p.template as Page['template'],
       strokes: p.strokes ?? [],
       textAnnotations: p.text_annotations ?? [],
+      backgroundPdfUrl: p.background_pdf_url,
     })),
   }));
 }
@@ -201,6 +202,7 @@ export async function getNotebook(id: string): Promise<Notebook | undefined> {
       template: p.template as Page['template'],
       strokes: p.strokes ?? [],
       textAnnotations: p.text_annotations ?? [],
+      backgroundPdfUrl: p.background_pdf_url,
     })),
   };
 }
@@ -378,4 +380,113 @@ export async function deleteFolder(id: string): Promise<void> {
   // notebook_folders rows are deleted via ON DELETE CASCADE
   const { error } = await supabase.from('folders').delete().eq('id', id);
   if (error) throw error;
+}
+
+export async function getFolder(id: string): Promise<Folder | undefined> {
+  ensureSignedIn();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return undefined;
+  const { data: row, error } = await supabase
+    .from('folders')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row || row.user_id !== user.id) return undefined;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    created_date: row.created_date,
+  };
+}
+
+// ─── Notebook ↔ folder links ──────────────────────────────────────────────
+
+export async function addNotebookToFolder(notebookId: string, folderId: string): Promise<void> {
+  ensureSignedIn();
+  const { error } = await supabase.from('notebook_folders').insert({
+    notebook_id: notebookId,
+    folder_id: folderId,
+    created_at: Date.now(),
+  });
+  if (error) throw error;
+}
+
+export async function removeNotebookFromFolder(notebookId: string, folderId: string): Promise<void> {
+  ensureSignedIn();
+  const { error } = await supabase
+    .from('notebook_folders')
+    .delete()
+    .eq('notebook_id', notebookId)
+    .eq('folder_id', folderId);
+  if (error) throw error;
+}
+
+export async function getNotebooksInFolder(folderId: string): Promise<Notebook[]> {
+  ensureSignedIn();
+  const { data: rows, error } = await supabase
+    .from('notebook_folders')
+    .select('notebook_id')
+    .eq('folder_id', folderId);
+  if (error) throw error;
+  const ids = (rows ?? []).map((r) => r.notebook_id).filter(Boolean);
+  if (ids.length === 0) return [];
+  return getNotebooksByIds(ids);
+}
+
+export async function getFoldersForNotebook(notebookId: string): Promise<Folder[]> {
+  ensureSignedIn();
+  const { data: rows, error } = await supabase
+    .from('notebook_folders')
+    .select('folder_id')
+    .eq('notebook_id', notebookId);
+  if (error) throw error;
+  const ids = (rows ?? []).map((r) => r.folder_id).filter(Boolean);
+  if (ids.length === 0) return [];
+  const { data: folderRows, error: fErr } = await supabase
+    .from('folders')
+    .select('*')
+    .in('id', ids);
+  if (fErr) throw fErr;
+  return (folderRows ?? []).map((r) => ({
+    id: r.id,
+    user_id: r.user_id,
+    name: r.name,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    created_date: r.created_date,
+  }));
+}
+
+// Helper: fetch several notebooks by id (used by folder queries)
+async function getNotebooksByIds(ids: string[]): Promise<Notebook[]> {
+  const { data: nbRows, error: nbErr } = await supabase
+    .from('notebooks')
+    .select('*')
+    .in('id', ids);
+  if (nbErr) throw nbErr;
+  if (!nbRows || nbRows.length === 0) return [];
+  const pagesByNotebook = await fetchAllPages(nbRows.map((r) => r.id));
+  return nbRows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    created_date: row.created_date,
+    coverColor: row.cover_color,
+    coverStyle: row.cover_style as Notebook['coverStyle'],
+    version: row.version,
+    aiChat: row.ai_chat ?? [],
+    pages: (pagesByNotebook.get(row.id) ?? []).map((p) => ({
+      id: p.id,
+      pageNumber: p.page_number,
+      template: p.template as Page['template'],
+      strokes: p.strokes ?? [],
+      textAnnotations: p.text_annotations ?? [],
+      backgroundPdfUrl: p.background_pdf_url,
+    })),
+  }));
 }

@@ -5,11 +5,18 @@ import {
 } from 'react-router-dom';
 import { LibraryView } from './components/LibraryView';
 import { FoldersView } from './components/FoldersView';
+import { FolderDetail } from './components/FolderDetail';
 import { EditorView } from './components/Editor/EditorView';
 import { Notebook, getNotebook } from './storage/cloud';
 import { AuthPage } from './components/Auth/AuthPage';
 import { CustomThemeProvider } from './ThemeContext';
 import { supabase } from './storage/supabaseClient';
+
+// ─── Folder detail route wrapper ───────────────────────────────────────
+const FolderDetailRoute: React.FC<{ onSignOut: () => void }> = ({ onSignOut }) => {
+  const { folderId } = useParams<{ folderId: string }>();
+  return <FolderDetail folderId={folderId!} onSignOut={onSignOut} />;
+};
 
 // ─── Editor route wrapper — loads the notebook by id from the URL ──────
 const EditorRoute: React.FC = () => {
@@ -69,6 +76,11 @@ const AppContent: React.FC = () => {
       <Route path="/Folders" element={
         <AuthGuard>
           <FoldersView onSignOut={handleSignOut} />
+        </AuthGuard>
+      } />
+      <Route path="/Folders/:folderId" element={
+        <AuthGuard>
+          <FolderDetailRoute onSignOut={handleSignOut} />
         </AuthGuard>
       } />
       <Route path="/Editor/:id" element={

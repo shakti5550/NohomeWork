@@ -304,19 +304,43 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 2,
-                  transition: 'background-color 0.2s',
+                  width: '100%',
+                  border: '1px solid transparent',
+                  transition: 'background-color 0.2s, border-color 0.2s, box-shadow 0.2s',
+                  position: 'relative',
                   '&:hover': {
-                    bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)'
+                    bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.15)' : 'rgba(37, 99, 235, 0.05)',
+                    borderColor: mode === 'dark' ? 'rgba(37, 99, 235, 0.3)' : 'rgba(37, 99, 235, 0.3)',
                   }
                 }}
               >
-                <Box sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 2,
-                  flex: 1,
-                  minWidth: 0
-                }}>
+                <Box
+                  component="button"
+                  type="button"
+                  onClick={() => navigate('/Folders/' + folder.id)}
+                  aria-label={`Open folder ${folder.name}`}
+                  sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    cursor: 'pointer',
+                    background: 'none',
+                    border: 'none',
+                    color: 'inherit',
+                    font: 'inherit',
+                    textAlign: 'left',
+                    padding: 0,
+                    borderRadius: 1,
+                    margin: -2,
+                    '&:focus-visible': {
+                      outline: '2px solid',
+                      outlineColor: mode === 'dark' ? '#60a5fa' : '#1d4ed8',
+                      outlineOffset: 2,
+                    }
+                  }}
+                >
                   <Box sx={{
                     width: 40,
                     height: 40,
