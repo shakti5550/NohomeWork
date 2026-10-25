@@ -320,6 +320,7 @@ export async function createDefaultNotebook(title: string = 'Untitled Notebook')
 
 export interface Folder {
   id: string;
+  user_id?: string;
   name: string;
   createdAt: number;
   updatedAt: number;
@@ -327,15 +328,28 @@ export interface Folder {
 }
 
 export async function createFolder(name: string): Promise<Folder> {
+  ensureSignedIn();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+
   const now = Date.now();
   const folder: Folder = {
     id: 'fld_' + Math.random().toString(36).substring(2, 9),
+    user_id: user.id,
     name,
     createdAt: now,
     updatedAt: now,
     created_date: new Date().toISOString().slice(0, 10),
   };
-  const { error } = await supabase.from('folders').insert(folder);
+  // Map camelCase fields to the snake_case column names in the DB
+  const { error } = await supabase.from('folders').insert({
+    id: folder.id,
+    user_id: folder.user_id,
+    name: folder.name,
+    created_at: folder.createdAt,
+    updated_at: folder.updatedAt,
+    created_date: folder.created_date,
+  });
   if (error) throw error;
   return folder;
 }
