@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   Typography, Button, IconButton, Menu as MuiMenu, MenuItem, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, Card, Divider, Alert, useMediaQuery,
-  useTheme
+  DialogContent, DialogActions, TextField, Card, Alert, useMediaQuery,
+  useTheme, Select, FormControl, InputLabel, OutlinedInput, CircularProgress
 } from '@mui/material';
 import {
   BookOpen, Plus, Trash2, Star, Folder, Search, Menu as MenuIcon, X, MoreVertical, Download
 } from 'lucide-react';
-import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook, createFolder, getFolders, deleteFolder } from '../storage/cloud';
+import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook, createFolder, getFolders, addNotebookToFolder } from '../storage/cloud';
 import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
@@ -35,6 +35,18 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [menuNotebookId, setMenuNotebookId] = useState<string | null>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);
+  // Add-to-folder dialog
+  const [addFolderOpen, setAddFolderOpen] = useState(false);
+  const [selectedFolderId, setSelectedFolderId] = useState<string>('');
+  const [isCustom, setIsCustom] = useState(false);
+  const [customFolderName, setCustomFolderName] = useState('');
+  const [foldersList, setFoldersList] = useState<any[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(false);
+  const [pendingFolderId, setPendingFolderId] = useState<string | null>(null);
+  // Retains the notebook ID across renders so handlers work even after
+  // handleMenuClose clears menuNotebookId. Also holds a freshly-created
+  // folder id for retry on add-failure.
+  const [pendingNotebookId, setPendingNotebookId] = useState<string | null>(null);
 
   const loadNotebooks = async () => {
     try {
@@ -122,9 +134,99 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
     handleMenuClose();
     setImportNotice('Favorites screen coming soon.');
   };
-  const handleAddToFolder = () => {
+  const handleAddToFolder = async () => {
+    // Capture before handleMenuClose clears menuNotebookId
+    const nbId = menuNotebookId;
     handleMenuClose();
-    setImportNotice('Folders screen coming soon.');
+    if (!nbId) return;
+    setPendingNotebookId(nbId);
+    setFoldersLoading(true);
+    setAddFolderOpen(true);
+    setSelectedFolderId('');
+    setIsCustom(false);
+    setCustomFolderName('');
+    setPendingFolderId(null);
+    try {
+      const list = await getFolders();
+      setFoldersList(list);
+    } catch (err: any) {
+      setImportNotice(err.message || 'Failed to load folders');
+    } finally {
+      setFoldersLoading(false);
+    }
+  };
+
+  // Only updates selection — does not perform the write
+  const handleFolderSelect = (value: string) => {
+    setSelectedFolderId(value);
+    // Clear stale retry state regardless of which option was chosen.
+    // If the user picks an existing folder, it's already in foldersList.
+    // If they pick custom, a fresh folder will be created.
+    setPendingFolderId(null);
+    if (value === 'custom') {
+      setIsCustom(true);
+      return;
+    }
+    setIsCustom(false);
+  };
+
+  // Called from the Add button — performs the write
+  // Retries a pending folder-link if create+add partially failed above.
+  const handleAddSelected = async () => {
+    const nbId = pendingNotebookId;
+    if (!nbId) return;
+    // Retry: folder already exists, only re-attempt the link
+    if (pendingFolderId) {
+      try {
+        await addNotebookToFolder(nbId, pendingFolderId);
+        setImportNotice('Notebook added to folder.');
+        setAddFolderOpen(false);
+        setPendingFolderId(null);
+      } catch (err: any) {
+        setImportNotice(err.message || 'Failed to add to folder. Please try again.');
+      }
+      return;
+    }
+    if (isCustom) {
+      await handleCreateAndAdd();
+      return;
+    }
+    if (!selectedFolderId) return;
+    try {
+      await addNotebookToFolder(nbId, selectedFolderId);
+      setImportNotice('Notebook added to folder.');
+      setAddFolderOpen(false);
+      setPendingFolderId(null);
+    } catch (err: any) {
+      setImportNotice(err.message || 'Failed to add to folder');
+    }
+  };
+
+  // Creates a new folder AND links the notebook. On partial failure
+  // (folder created but link failed), retains the folder ID for retry.
+  const handleCreateAndAdd = async () => {
+    const nbId = pendingNotebookId;
+    const name = customFolderName.trim();
+    if (!name || !nbId) return;
+    try {
+      const folder = await createFolder(name);
+      setPendingFolderId(folder.id);
+      setFoldersList((prev) => [...prev, folder]);
+      try {
+        await addNotebookToFolder(nbId, folder.id);
+        setImportNotice(`Created folder "${folder.name}" and added notebook.`);
+        setAddFolderOpen(false);
+        setPendingFolderId(null);
+        setCustomFolderName('');
+      } catch (err: any) {
+        // Folder was created but link failed — keep dialog open so user can retry
+        setImportNotice(
+          `Folder "${folder.name}" created, but failed to add notebook. Retry?`
+        );
+      }
+    } catch (err: any) {
+      setImportNotice(err.message || 'Failed to create folder');
+    }
   };
 
   const filteredNotebooks = notebooks.filter(nb =>
@@ -482,6 +584,88 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
         <DialogActions sx={{ p: 2, px: 3 }}>
           <Button onClick={() => setNewDialogOpen(false)} sx={{ color: '#64748b', textTransform: 'none' }}>Cancel</Button>
           <Button onClick={handleCreateNotebook} variant="contained" sx={{ textTransform: 'none', borderRadius: 2 }}>Create</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add to folder dialog */}
+      <Dialog
+        open={addFolderOpen}
+        onClose={() => {
+          setAddFolderOpen(false);
+          setSelectedFolderId('');
+          setIsCustom(false);
+          setCustomFolderName('');
+          setPendingFolderId(null);
+        }}
+        fullWidth={isMobile}
+        PaperProps={{ sx: { borderRadius: 3, p: 1, width: isMobile ? '100%' : 400 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Add to a folder</DialogTitle>
+        <DialogContent>
+          <FormControl fullWidth sx={{ mt: 2, mb: 3 }}>
+            <InputLabel id="folder-select-label">Folder</InputLabel>
+            <Select
+              labelId="folder-select-label"
+              value={selectedFolderId}
+              label="Folder"
+              onChange={(e) => handleFolderSelect(e.target.value as string)}
+              disabled={foldersLoading}
+              input={<OutlinedInput label="Folder" />}
+              sx={{
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'primary.main' },
+              }}
+            >
+              {foldersLoading ? (
+                <MenuItem disabled>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CircularProgress size={16} />
+                    Loading folders...
+                  </Box>
+                </MenuItem>
+              ) : foldersList.length === 0 ? (
+                <MenuItem disabled>No folders yet — create one below</MenuItem>
+              ) : (
+                foldersList.map((folder) => (
+                  <MenuItem key={folder.id} value={folder.id}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Folder size={16} />
+                      {folder.name}
+                    </Box>
+                  </MenuItem>
+                ))
+              )}
+              <MenuItem value="custom">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Plus size={16} />
+                  Custom (create new)
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
+          {isCustom && (
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Folder name"
+              fullWidth
+              variant="outlined"
+              value={customFolderName}
+              onChange={(e) => setCustomFolderName(e.target.value)}
+              placeholder="e.g., Physics notes"
+              sx={{ mb: 1 }}
+            />
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, px: 3 }}>
+          <Button onClick={() => setAddFolderOpen(false)} sx={{ color: '#64748b', textTransform: 'none' }}>Cancel</Button>
+          <Button
+            onClick={handleAddSelected}
+            disabled={!isCustom && !selectedFolderId}
+            variant="contained"
+            sx={{ textTransform: 'none', borderRadius: 2 }}
+          >
+            {isCustom ? 'Create & Add' : 'Add'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>
