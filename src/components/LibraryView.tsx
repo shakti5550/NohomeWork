@@ -12,6 +12,7 @@ import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, d
 import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
+import { useNavigate } from 'react-router-dom';
 
 interface LibraryViewProps {
   onOpenNotebook: (notebookId: string) => void;
@@ -19,6 +20,7 @@ interface LibraryViewProps {
 }
 
 export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSignOut }) => {
+  const navigate = useNavigate();
   const theme = useTheme();
   const { mode, toggleTheme } = useThemeMode();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
