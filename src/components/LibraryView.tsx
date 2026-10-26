@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   Typography, Button, IconButton, Menu as MuiMenu, MenuItem, Dialog, DialogTitle,
@@ -6,7 +6,8 @@ import {
   useTheme, Select, FormControl, InputLabel, OutlinedInput, CircularProgress
 } from '@mui/material';
 import {
-  BookOpen, Plus, Trash2, Star, Folder, Search, Menu as MenuIcon, X, Download
+  BookOpen, Plus, Trash2, Star, Folder, Search, Menu as MenuIcon, X, Download,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook, createFolder, getFolders, addNotebookToFolder, setFavourite } from '../storage/cloud';
 import { AppLogo } from './AppLogo';
@@ -15,6 +16,66 @@ import { ProfileDropdown } from './Auth/ProfileDropdown';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { NotebookTile } from './NotebookTile';
 import { Toast } from './Toast';
+
+// ─── Date grouping helpers ─────────────────────────────────────────────────
+// Notebooks are grouped by the calendar day they were created on, newest
+// first. Each group renders as a collapsible section: a full-format date
+// header (e.g. "Monday, 26th October 2026") with a chevron at the far right,
+// followed by the notebook tiles created on that day.
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+  'August', 'September', 'October', 'November', 'December'];
+
+/** Ordinal suffix for a day-of-month: 1→st, 2→nd, 3→rd, 4..20→th, 21→st, … */
+function ordinal(day: number): string {
+  const mod100 = day % 100;
+  if (mod100 >= 11 && mod100 <= 13) return 'th';
+  switch (day % 10) {
+    case 1: return 'st';
+    case 2: return 'nd';
+    case 3: return 'rd';
+    default: return 'th';
+  }
+}
+
+/** Returns the calendar-day key (YYYY-MM-DD) for a notebook. */
+function notebookDayKey(nb: Notebook): string {
+  if (nb.created_date) return nb.created_date;
+  return new Date(nb.createdAt).toISOString().slice(0, 10);
+}
+
+/** Renders a YYYY-MM-DD key as "Weekday, Dth Month YYYY". */
+function formatDateFull(key: string): string {
+  const [y, m, d] = key.split('-').map(Number);
+  const date = new Date(y, (m ?? 1) - 1, d ?? 1);
+  const weekday = WEEKDAYS[date.getDay()];
+  const month = MONTHS[date.getMonth()];
+  return `${weekday}, ${d}${ordinal(d)} ${month} ${y}`;
+}
+
+interface DateGroup {
+  key: string;
+  label: string;
+  notebooks: Notebook[];
+}
+
+/** Groups notebooks by creation day, newest date first. */
+function groupByDate(notebooks: Notebook[]): DateGroup[] {
+  const map = new Map<string, Notebook[]>();
+  for (const nb of notebooks) {
+    const key = notebookDayKey(nb);
+    let bucket = map.get(key);
+    if (!bucket) {
+      bucket = [];
+      map.set(key, bucket);
+    }
+    bucket.push(nb);
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
+    .map(([key, notebooks]) => ({ key, label: formatDateFull(key), notebooks }));
+}
 
 interface LibraryViewProps {
   onOpenNotebook: (notebookId: string) => void;
@@ -50,6 +111,11 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
   // handleMenuClose clears menuNotebookId. Also holds a freshly-created
   // folder id for retry on add-failure.
   const [pendingNotebookId, setPendingNotebookId] = useState<string | null>(null);
+  // Which date-group sections are expanded. By default only the newest
+  // group (today, or the closest earlier date if nothing was created today)
+  // is expanded; the rest start collapsed. Seeded once notebooks load.
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const seededRef = useRef(false);
 
   const loadNotebooks = async () => {
     try {
@@ -69,12 +135,27 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
     setIsSidebarOpen(!isMobile);
   }, [isMobile]);
 
+  // Seed expanded state once notebooks load: expand the newest date group
+  // (today, or the closest earlier date if nothing was created today).
+  // Seeded only on first load so user toggles are never overridden.
+  useEffect(() => {
+    if (seededRef.current || notebooks.length === 0) return;
+    const groups = groupByDate(notebooks);
+    if (groups.length === 0) return;
+    seededRef.current = true;
+    setExpandedDays(new Set([groups[0].key]));
+  }, [notebooks]);
+
   const handleCreateNotebook = async () => {
     const nb = await createDefaultNotebook(newTitle);
     nb.coverColor = coverColor;
     await saveNotebook(nb);
     setNewDialogOpen(false);
     setNewTitle('Untitled Notebook');
+    // The new notebook may land in a date group the user has not expanded
+    // yet (e.g. today, when the seeded group was an older date). Add its
+    // day key to expandedDays so it's visible, preserving existing toggles.
+    setExpandedDays((prev) => new Set(prev).add(notebookDayKey(nb)));
     loadNotebooks();
   };
 
@@ -248,6 +329,16 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
     nb.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Toggle a date group's expanded/collapsed state.
+  const toggleDay = (key: string) => {
+    setExpandedDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   // Which "shelf" this LibraryView is currently rendering. LibraryView is
   // also the shell for the Favorites page, so the heading and the grid
   // contents both depend on the route rather than on a separate prop.
@@ -256,6 +347,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
   const visibleNotebooks = isFavorites
     ? filteredNotebooks.filter((nb) => nb.favourite)
     : filteredNotebooks;
+
+  // Search: derive which date-group keys have at least one matching notebook.
+  // Any group with matches is treated as expanded regardless of the user's
+  // saved toggles so the user sees results without having to manually expand.
+  const searchVisibleGroupKeys = (() => {
+    if (!searchQuery) return new Set<string>();
+    const q = searchQuery.toLowerCase();
+    const keys = new Set<string>();
+    for (const nb of visibleNotebooks) {
+      if (nb.title.toLowerCase().includes(q)) keys.add(notebookDayKey(nb));
+    }
+    return keys;
+  })();
 
   // The notebook whose ⋮ menu is currently open — used to label the
   // favourite action ("Mark as favourite" vs "Remove from favourites").
@@ -347,7 +451,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             <ListItemText primary="Folders" />
           </ListItemButton>
         </ListItem>
-              </List>
+      </List>
 
       <Box sx={{ pt: 2, pb: 1 }}>
         <Button
@@ -505,26 +609,98 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
           </Box>
         </Box>
 
-        {/* Notebook Grid */}
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            sm: 'repeat(auto-fill, minmax(180px, 1fr))',
-            md: 'repeat(auto-fill, minmax(220px, 1fr))'
-          },
-          gap: { xs: 2, md: 3 }
-        }}>
-          {visibleNotebooks.map((nb) => (
-            <NotebookTile
-              key={nb.id}
-              nb={nb}
-              onOpen={onOpenNotebook}
-              onMenuOpen={handleMenuOpen}
-              menuActiveId={menuNotebookId}
-            />
-          ))}
-        </Box>
+        {/* Notebook Grid — grouped by creation date, newest first.
+            Each date is a collapsible section: header with full date +
+            chevron at the far right, tiles below when expanded.
+            The Favorites page keeps the old flat grid (no grouping). */}
+        {isFavorites ? (
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              sm: 'repeat(auto-fill, minmax(180px, 1fr))',
+              md: 'repeat(auto-fill, minmax(220px, 1fr))'
+            },
+            gap: { xs: 2, md: 3 }
+          }}>
+            {visibleNotebooks.map((nb) => (
+              <NotebookTile
+                key={nb.id}
+                nb={nb}
+                onOpen={onOpenNotebook}
+                onMenuOpen={handleMenuOpen}
+                menuActiveId={menuNotebookId}
+              />
+            ))}
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {groupByDate(visibleNotebooks).map((group) => {
+              // During search, force-expand groups that contain matching notebooks
+              // without permanently changing the user's saved toggle state.
+              const expanded = expandedDays.has(group.key) || searchVisibleGroupKeys.has(group.key);
+              return (
+                <Box key={group.key} sx={{ display: 'flex', flexDirection: 'column' }}>
+                  {/* Button control: keyboard-focusable, with aria-expanded for screen readers.
+                    Styling matches the previous Box (same background, hover, rounded corners). */}
+                  <button
+                    type="button"
+                    onClick={() => toggleDay(group.key)}
+                    aria-expanded={expanded}
+                    aria-label={`Toggle ${group.label}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      padding: '8px 8px',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      fontSize: 'inherit',
+                      background: mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)',
+                      transition: 'background-color 0.15s',
+                      color: 'inherit'
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)')}
+                  >
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                      {group.label}
+                    </Typography>
+                    <Box sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center' }}>
+                      {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </Box>
+                  </button>
+                  {expanded && (
+                    <Box sx={{
+                      display: 'grid',
+                      gridTemplateColumns: {
+                        xs: '1fr',
+                        sm: 'repeat(auto-fill, minmax(180px, 1fr))',
+                        md: 'repeat(auto-fill, minmax(220px, 1fr))'
+                      },
+                      gap: { xs: 2, md: 3 },
+                      pl: 0.5,
+                      mt: 1.5
+                    }}>
+                      {group.notebooks.map((nb) => (
+                        <NotebookTile
+                          key={nb.id}
+                          nb={nb}
+                          onOpen={onOpenNotebook}
+                          onMenuOpen={handleMenuOpen}
+                          menuActiveId={menuNotebookId}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+        )}
 
         {/* Per-notebook menu (⋮) — replaces the old per-tile delete button */}
         <MuiMenu
