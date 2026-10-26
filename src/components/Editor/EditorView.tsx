@@ -910,7 +910,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                   // Right-side buttons: pin to the right edge, clear left.
                   // Left-side buttons: keep their original left position.
                   left: isRightSide ? undefined : btn.props.style?.left,
-                  right: isRightSide ? 6 : undefined,
+                  right: isRightSide ? 16 : undefined,
                   top: isRightSide
                     ? `calc(${16 + (i - (floatButtons.length - 3)) * (48 + 12)}px)`
                     : btn.props.style?.top,
