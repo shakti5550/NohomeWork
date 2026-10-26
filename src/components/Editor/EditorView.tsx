@@ -129,6 +129,12 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // the status bar and the top of the paper, in the same left-to-right order.
   const isTabletPortrait = useMediaQuery('(min-width: 768px) and (max-width: 1024px) and (orientation: portrait)');
 
+  // Phone held in landscape: the left stack is too tall for the narrow
+  // screen, so the bottom three controls (Pages, AI Chat, Mic) move to the
+  // right edge instead of overlapping the top ones. Tablets and laptops are
+  // untouched — they keep their existing layouts.
+  const isPhoneLandscape = isPhone && isLandscape;
+
   // When the vertical left stack is active it occupies 16..64px, so the canvas
   // container gets left padding to keep the paper clear of the buttons.
   // Top-row and bottom-strip layouts don't need this.
@@ -886,7 +892,35 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           Back → Tools → Add Page → Delete → Hand → Pages → AI Chat → Mic.
           On iPad portrait the last three (Pages, Chat, Mic) move to the
           right end of the top row, Mic rightmost. */}
-      {isTabletPortrait ? (
+      {isPhoneLandscape ? (
+        // Phone in landscape: the full left stack is too tall for the narrow
+        // screen, so the bottom three controls (Pages, AI Chat, Mic) move to
+        // the right edge instead of overlapping the top ones.
+        <div className="nhw-float-stack" data-side="right">
+          {floatButtons.map((btn, i) => {
+            const Comp = btn.comp;
+            const isRightSide = i >= floatButtons.length - 3;
+            return (
+              <Comp
+                key={`nhw-float-${i}`}
+                {...btn.props}
+                style={{
+                  ...btn.props.style,
+                  position: 'fixed',
+                  // Right-side buttons: pin to the right edge, clear left.
+                  // Left-side buttons: keep their original left position.
+                  left: isRightSide ? undefined : btn.props.style?.left,
+                  right: isRightSide ? 6 : undefined,
+                  top: isRightSide
+                    ? `calc(${16 + (i - (floatButtons.length - 3)) * (48 + 12)}px)`
+                    : btn.props.style?.top,
+                  bottom: isRightSide ? undefined : btn.props.style?.bottom,
+                }}
+              />
+            );
+          })}
+        </div>
+      ) : isTabletPortrait ? (
         // Tablet held vertically: a horizontal top row keeps the controls
         // clear of the status bar and the top of the paper, in the same
         // left-to-right order. Each button keeps its own colors.
@@ -1013,15 +1047,25 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             overflow: 'hidden',
             bgcolor: mode === 'dark' ? '#1e293b' : '#fff',
             position: 'relative',
-            width: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px` : '100%',
-            maxWidth: isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px`
+            // Phones (portrait & landscape): full-bleed sheet, fills top to
+            // bottom so the empty margins disappear. iPads and laptops keep
+            // their existing constrained layout — this branch is phone-only.
+            width: isPhone ? '100%'
+              : isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px`
+              : '100%',
+            maxWidth: isPhone ? '100%'
+              : isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px`
               : isTabletPortrait ? '100vw'
                 : { xs: '98vw', sm: '94vw', md: '800px' },
-            height: isTabletPortrait ? '100%'
+            height: isPhone ? '100%'
+              : isTabletPortrait ? '100%'
               : isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px`
                 : undefined,
-            maxHeight: isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px` : paperMaxHeight,
-            aspectRatio: isLandscape ? `${landscapeRatioNum} / 1`
+            maxHeight: isPhone ? '100%'
+              : isLandscape && pageMaxHeight > 0 ? `${pageMaxHeight}px`
+              : paperMaxHeight,
+            aspectRatio: isPhone ? 'auto'
+              : isLandscape ? `${landscapeRatioNum} / 1`
               : isTabletPortrait ? 'auto'
                 : '4 / 5',
           }}
