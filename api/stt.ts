@@ -111,35 +111,40 @@ export default async function handler(req: Request): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30_000);
 
-    const res = await fetch(provider.endpoint, {
-      method: 'POST',
-      headers: provider.auth(key),
-      body: outbound,
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
+    try {
+      const res = await fetch(provider.endpoint, {
+        method: 'POST',
+        headers: provider.auth(key),
+        body: outbound,
+        signal: controller.signal,
+      });
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`${provider.name}: HTTP ${res.status} ${text.slice(0, 200)}`);
-    }
-
-    const json = await res.json() as { text?: string; error?: string };
-    if (json.error) throw new Error(`${provider.name}: ${json.error}`);
-
-    const text = (json.text ?? '').trim();
-    if (!text) throw new Error(`${provider.name}: empty transcription`);
-
-    return new Response(
-      JSON.stringify({ text, provider: provider.name }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`${provider.name}: HTTP ${res.status} ${text.slice(0, 200)}`);
       }
-    );
+
+      const json = await res.json() as { text?: string; error?: string };
+      if (json.error) throw new Error(`${provider.name}: ${json.error}`);
+
+      const text = (json.text ?? '').trim();
+      if (!text) throw new Error(`${provider.name}: empty transcription`);
+
+      return new Response(
+        JSON.stringify({ text, provider: provider.name }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      );
+    } finally {
+      // Cleared only after the body has been fully read, so a stalled
+      // response can't hang the function past the 30s limit.
+      clearTimeout(timeout);
+    }
   } catch (err: any) {
     return new Response(
       JSON.stringify({ error: err.message || 'Internal server error' }),

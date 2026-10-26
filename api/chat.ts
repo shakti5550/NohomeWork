@@ -6,16 +6,22 @@
 // serverless/function-edge-env injection — they never appear in the client
 // bundle.
 //
-// Per-model timeout: 8s. Overall provider budget: 25s (hard deadline).
-// This ensures a dead provider (e.g. Kilo unreachable) can't exhaust
-// Vercel's function timeout — the chain moves on after ~25s max.
+// Per-model timeout: 15s. Overall provider budget: 50s (hard deadline).
+// The timer stays armed until the response body has been fully read, so a
+// provider that returns 200 but stalls the body can't hang the function
+// until Vercel's own timeout kills it. This bounds the chain so a dead or
+// stalled provider can't exhaust Vercel's function timeout.
 //
 // Supported providers (fallback in order). Each provider tries its models
 // in order until one succeeds, then falls back to the next provider.
-//   KILO_API_KEY       → Kilo Gateway (many models, auto-rotate)
-//   GEMINI_API_KEY     → Gemini 2.0 Flash (Google)
-//   OPENROUTER_API_KEY → google/gemini-2.0-flash-001 (OpenRouter)
-//   NVIDIA_API_KEY     → meta/llama-3.1-8b-instruct (NVIDIA NIM)
+//   GEMINI_API_KEY     → Gemini 2.5 Flash / 3.5-flash-lite (Google)
+//   OPENROUTER_API_KEY → llama-3.1-8b / dots-3-note-preview (OpenRouter)
+//
+// KILO_API_KEY and NVIDIA_API_KEY are no longer usable for CHAT: every
+// Kilo model requires credits (account balance 0) and every Nvidia model
+// was retired on 2026-08-26. Keep KILO_API_KEY set if STT uses it —
+// api/stt.ts still calls Kilo's audio endpoint. Drop NVIDIA_API_KEY.
+// Re-add the providers below if you add credits or rotate models.
 
 // Node.js globals — this file runs server-side on Vercel, not in the browser.
 // The project has no tsconfig/@types/node, so declare the ones we use.
@@ -46,31 +52,6 @@ interface ProviderConfig {
 
 const PROVIDERS: ProviderConfig[] = [
   {
-    name: 'kilo',
-    // Kilo Gateway — OpenAI-compatible. xKiro tier gives 5M free tokens/day.
-    // Endpoint: api.kilo.ai/api/gateway (NOT gateway.kilo.ai — that domain
-    // doesn't exist).
-    endpoint: 'https://api.kilo.ai/api/gateway/chat/completions',
-    headers: (key) => ({
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
-    }),
-    buildBody: (message, history, model) => ({
-      model,
-      messages: [...history, { role: 'user', content: message }],
-    }),
-    parseResponse: (json) => json?.choices?.[0]?.message?.content ?? '',
-    // Auto-rotate: try each in order until one responds.
-    // IDs confirmed from Kilo Gateway docs (bare vendor/model format).
-    // Kept short so a dead/unreachable provider fails fast instead of
-    // burning the whole Vercel timeout budget.
-    models: [
-      'google/gemini-2.0-flash-001',
-      'anthropic/claude-sonnet-4.6',
-      'openai/gpt-5.4-mini',
-    ],
-  },
-  {
     name: 'gemini',
     // Model goes in the URL path for Gemini.
     endpoint: (model) =>
@@ -87,10 +68,20 @@ const PROVIDERS: ProviderConfig[] = [
         })),
         { role: 'user', parts: [{ text: message }] },
       ],
+      // Gemini 2.5 Flash thinks by default, and thinking tokens count
+      // toward maxOutputTokens — a 512 cap left only ~18 tokens for the
+      // answer and truncated it (finishReason: MAX_TOKENS). Reserve the
+      // budget for the actual answer.
+      generationConfig: {
+        maxOutputTokens: 512,
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     }),
     parseResponse: (json) =>
       json?.candidates?.[0]?.content?.parts?.[0]?.text ?? '',
-    models: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+    // gemini-2.0-flash and gemini-1.5-flash are both retired. 3.5-flash-lite
+    // is the current free-tier fallback (Google's own recommendation).
+    models: ['gemini-2.5-flash', 'gemini-3.5-flash-lite'],
   },
   {
     name: 'openrouter',
@@ -104,31 +95,21 @@ const PROVIDERS: ProviderConfig[] = [
     buildBody: (message, history, model) => ({
       model,
       messages: [...history, { role: 'user', content: message }],
+      max_tokens: 512,
     }),
     parseResponse: (json) => json?.choices?.[0]?.message?.content ?? '',
-    models: ['google/gemini-2.0-flash-001', 'google/gemini-2.0-flash-lite-001'],
-  },
-  {
-    name: 'nvidia',
-    endpoint: 'https://integrate.api.nvidia.com/v1/chat/completions',
-    headers: (key) => ({
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
-    }),
-    buildBody: (message, history, model) => ({
-      model,
-      messages: [...history, { role: 'user', content: message }],
-    }),
-    parseResponse: (json) => json?.choices?.[0]?.message?.content ?? '',
-    models: ['meta/llama-3.1-8b-instruct', 'meta/llama-3.1-70b-instruct'],
+    // gemini-2.0-flash-001 was retired on OpenRouter. Both are free:
+    // llama-3.1-8b is ~$0.00005/M tokens, dots3 is fully $0.
+    models: [
+      'meta-llama/llama-3.1-8b-instruct',
+      'dots-studio/dots-3-note-preview:free',
+    ],
   },
 ];
 
 const KEYS: Record<string, string | undefined> = {
-  kilo: process.env.KILO_API_KEY,
   gemini: process.env.GEMINI_API_KEY,
   openrouter: process.env.OPENROUTER_API_KEY,
-  nvidia: process.env.NVIDIA_API_KEY,
 };
 
 async function sendMessage(
@@ -144,7 +125,7 @@ async function sendMessage(
 
   // Hard cap on total time spent trying providers. Without this, one dead
   // provider with many models can exhaust Vercel's function timeout.
-  const deadline = Date.now() + 25_000;
+  const deadline = Date.now() + 50_000;
 
   for (const provider of providers) {
     const key = KEYS[provider.name];
@@ -161,10 +142,10 @@ async function sendMessage(
         throw new Error('All AI providers failed: ' + errors.join(' | '));
       }
 
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8_000);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15_000);
 
+      try {
         const url =
           typeof provider.endpoint === 'function'
             ? provider.endpoint(model)
@@ -176,7 +157,6 @@ async function sendMessage(
           body: JSON.stringify(provider.buildBody(message, history, model)),
           signal: controller.signal,
         });
-        clearTimeout(timeout);
 
         if (!res.ok) {
           const text = await res.text().catch(() => '');
@@ -192,6 +172,10 @@ async function sendMessage(
         return { response: content, provider: `${provider.name}:${model}` };
       } catch (err: any) {
         errors.push(err.message || String(err));
+      } finally {
+        // Cleared only after the body has been fully read, so a stalled
+        // response can't hang the function past the 15s per-model limit.
+        clearTimeout(timeout);
       }
     }
   }
