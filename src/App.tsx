@@ -73,6 +73,11 @@ const AppContent: React.FC = () => {
           <LibraryView onOpenNotebook={(id) => navigate('/Editor/' + id)} onSignOut={handleSignOut} />
         </AuthGuard>
       } />
+      <Route path="/Favorites" element={
+        <AuthGuard>
+          <LibraryView onOpenNotebook={(id) => navigate('/Editor/' + id)} onSignOut={handleSignOut} />
+        </AuthGuard>
+      } />
       <Route path="/Folders" element={
         <AuthGuard>
           <FoldersView onSignOut={handleSignOut} />

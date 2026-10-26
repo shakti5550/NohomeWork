@@ -2,17 +2,18 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   Typography, Button, IconButton, Menu as MuiMenu, MenuItem, Dialog, DialogTitle,
-  DialogContent, DialogActions, TextField, Card, Alert, useMediaQuery,
+  DialogContent, DialogActions, TextField, Alert, useMediaQuery,
   useTheme, Select, FormControl, InputLabel, OutlinedInput, CircularProgress
 } from '@mui/material';
 import {
-  BookOpen, Plus, Trash2, Star, Folder, Search, Menu as MenuIcon, X, MoreVertical, Download
+  BookOpen, Plus, Trash2, Star, Folder, Search, Menu as MenuIcon, X, Download
 } from 'lucide-react';
-import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook, createFolder, getFolders, addNotebookToFolder } from '../storage/cloud';
+import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook, createFolder, getFolders, addNotebookToFolder, setFavourite } from '../storage/cloud';
 import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { NotebookTile } from './NotebookTile';
 import { Toast } from './Toast';
 
 interface LibraryViewProps {
@@ -22,6 +23,7 @@ interface LibraryViewProps {
 
 export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSignOut }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
   const { mode, toggleTheme } = useThemeMode();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -129,11 +131,23 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
     }
   };
 
-  // Favourite / folder actions are not wired up yet — surface a notice so the
-  // UI is ready for the dedicated screens when they land.
-  const handleFavourite = () => {
+  // Toggle the favourite flag on the notebook whose ⋮ menu is open.
+  // Capture the id first — handleMenuClose() below clears menuNotebookId.
+  const handleFavourite = async () => {
+    const nbId = menuNotebookId;
     handleMenuClose();
-    setImportNotice('Favorites screen coming soon.');
+    if (!nbId) return;
+    const nb = notebooks.find((n) => n.id === nbId);
+    const next = !(nb?.favourite);
+    try {
+      await setFavourite(nbId, next);
+      setNotebooks((prev) => prev.map((n) =>
+        n.id === nbId ? { ...n, favourite: next } : n
+      ));
+      setImportNotice(next ? 'Added to favourites.' : 'Removed from favourites.');
+    } catch (err: any) {
+      setImportNotice(err.message || 'Failed to update favourite');
+    }
   };
   const handleAddToFolder = async () => {
     // Capture before handleMenuClose clears menuNotebookId
@@ -234,6 +248,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
     nb.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Which "shelf" this LibraryView is currently rendering. LibraryView is
+  // also the shell for the Favorites page, so the heading and the grid
+  // contents both depend on the route rather than on a separate prop.
+  const isFavorites = location.pathname === '/Favorites';
+  const pageHeading = isFavorites ? 'Favorites' : 'Documents';
+  const visibleNotebooks = isFavorites
+    ? filteredNotebooks.filter((nb) => nb.favourite)
+    : filteredNotebooks;
+
+  // The notebook whose ⋮ menu is currently open — used to label the
+  // favourite action ("Mark as favourite" vs "Remove from favourites").
+  const menuNotebook = notebooks.find((n) => n.id === menuNotebookId) ?? null;
+
   const SidebarContent = (
     <Box sx={{
       width: 260,
@@ -258,28 +285,63 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
 
       <List sx={{ flexGrow: 1, gap: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         <ListItem disablePadding>
-          <ListItemButton selected sx={{
-            borderRadius: 2,
-            bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.25)' : '#eff6ff',
-            color: mode === 'dark' ? '#60a5fa' : '#1d4ed8',
-            '&.Mui-selected': {
-              bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.35)' : '#eff6ff',
-            }
-          }}>
+          <ListItemButton
+            selected={location.pathname === '/Home'}
+            onClick={() => navigate('/Home')}
+            sx={{
+              borderRadius: 2,
+              bgcolor: location.pathname === '/Home'
+                ? (mode === 'dark' ? 'rgba(37, 99, 235, 0.25)' : '#eff6ff')
+                : 'transparent',
+              color: location.pathname === '/Home'
+                ? (mode === 'dark' ? '#60a5fa' : '#1d4ed8')
+                : 'text.secondary',
+              '&.Mui-selected': {
+                bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.35)' : '#eff6ff',
+              }
+            }}
+          >
             <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><BookOpen size={20} /></ListItemIcon>
             <ListItemText primary="Documents" primaryTypographyProps={{ fontWeight: 600 }} />
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton sx={{ borderRadius: 2, color: 'text.secondary' }}>
+          <ListItemButton
+            selected={location.pathname === '/Favorites'}
+            onClick={() => navigate('/Favorites')}
+            sx={{
+              borderRadius: 2,
+              bgcolor: location.pathname === '/Favorites'
+                ? (mode === 'dark' ? 'rgba(37, 99, 235, 0.25)' : '#eff6ff')
+                : 'transparent',
+              color: location.pathname === '/Favorites'
+                ? (mode === 'dark' ? '#60a5fa' : '#1d4ed8')
+                : 'text.secondary',
+              '&.Mui-selected': {
+                bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.35)' : '#eff6ff',
+              }
+            }}
+          >
             <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><Star size={20} /></ListItemIcon>
             <ListItemText primary="Favorites" />
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
           <ListItemButton
+            selected={location.pathname.startsWith('/Folders')}
             onClick={() => navigate('/Folders')}
-            sx={{ borderRadius: 2, color: 'text.secondary' }}
+            sx={{
+              borderRadius: 2,
+              bgcolor: location.pathname.startsWith('/Folders')
+                ? (mode === 'dark' ? 'rgba(37, 99, 235, 0.25)' : '#eff6ff')
+                : 'transparent',
+              color: location.pathname.startsWith('/Folders')
+                ? (mode === 'dark' ? '#60a5fa' : '#1d4ed8')
+                : 'text.secondary',
+              '&.Mui-selected': {
+                bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.35)' : '#eff6ff',
+              }
+            }}
           >
             <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><Folder size={20} /></ListItemIcon>
             <ListItemText primary="Folders" />
@@ -354,7 +416,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
                   <MenuIcon size={24} />
                 </IconButton>
               )}
-              <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Documents</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pageHeading}</Typography>
               {/* Profile icon: mobile-only, right-aligned with title */}
               <Box sx={{
                 ml: 'auto',
@@ -453,54 +515,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
           },
           gap: { xs: 2, md: 3 }
         }}>
-          {filteredNotebooks.map((nb) => (
-            <Card
+          {visibleNotebooks.map((nb) => (
+            <NotebookTile
               key={nb.id}
-              sx={{
-                borderRadius: 3,
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                transition: 'transform 0.2s, box-shadow 0.2s',
-                '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' },
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                height: { xs: 240, md: 280 },
-                bgcolor: nb.coverColor,
-                color: '#fff',
-                position: 'relative'
-              }}
-              onClick={() => onOpenNotebook(nb.id)}
-            >
-              <Box sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <Box>
-                  <Typography variant="subtitle2" sx={{ opacity: 0.8, textTransform: 'uppercase', fontSize: '10px', letterSpacing: 1 }}>
-                    Notebook
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 700, mt: 1, lineHeight: 1.2, wordBreak: 'break-word', fontSize: { xs: '16px', md: '20px' } }}>
-                    {nb.title}
-                  </Typography>
-                </Box>
-
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, mt: 'auto' }}>
-                  <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                    {nb.pages.length} pages
-                  </Typography>
-                  <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                    {nb.created_date ?? new Date(nb.createdAt).toLocaleDateString()}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => handleMenuOpen(e, nb.id)}
-                    aria-label="Notebook options"
-                    aria-controls={menuNotebookId === nb.id ? 'notebook-menu' : undefined}
-                    aria-expanded={menuNotebookId === nb.id}
-                    sx={{ color: '#fff', opacity: 0.7, '&:hover': { opacity: 1, bgcolor: 'rgba(255,255,255,0.2)' } }}
-                  >
-                    <MoreVertical size={16} />
-                  </IconButton>
-                </Box>
-              </Box>
-            </Card>
+              nb={nb}
+              onOpen={onOpenNotebook}
+              onMenuOpen={handleMenuOpen}
+              menuActiveId={menuNotebookId}
+            />
           ))}
         </Box>
 
@@ -521,8 +543,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
             Export
           </MenuItem>
           <MenuItem onClick={handleFavourite}>
-            <Box sx={{ mr: 1, color: 'text.secondary' }}><Star size={18} /></Box>
-            Mark as favourite
+            <Box sx={{ mr: 1, color: menuNotebook?.favourite ? 'warning.main' : 'text.secondary' }}>
+              <Star size={18} fill={menuNotebook?.favourite ? 'currentColor' : 'none'} />
+            </Box>
+            {menuNotebook?.favourite ? 'Remove from favourites' : 'Mark as favourite'}
           </MenuItem>
           <MenuItem onClick={handleAddToFolder}>
             <Box sx={{ mr: 1, color: 'text.secondary' }}><Folder size={18} /></Box>

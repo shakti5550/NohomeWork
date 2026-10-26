@@ -6,7 +6,7 @@ import {
   Skeleton, CircularProgress
 } from '@mui/material';
 import {
-  BookOpen, Plus, Trash2, Folder as FolderIcon, Search, X, MoreVertical, Download, ArrowLeft
+  BookOpen, Plus, Trash2, Folder as FolderIcon, Search, X, Download, ArrowLeft, Star
 } from 'lucide-react';
 import {
   Notebook,
@@ -17,8 +17,10 @@ import {
   removeNotebookFromFolder,
   getNotebooksInFolder,
   getFolder,
+  setFavourite,
 } from '../storage/cloud';
 import { AppLogo } from './AppLogo';
+import { NotebookTile } from './NotebookTile';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
 import { useNavigate } from 'react-router-dom';
@@ -180,10 +182,24 @@ export const FolderDetail: React.FC<FolderDetailProps> = ({ folderId, onSignOut 
     }
   };
 
-  // ─── Favourite (placeholder for now) ──────────────────────────────────────
-  const handleFavourite = () => {
+  // ─── Favourite ──────────────────────────────────────────────────────────────
+  // The notebook whose ⋮ menu is open — used to label the favourite action.
+  const menuNotebook = notebooks.find((n) => n.id === menuNotebookId) ?? null;
+
+  const handleFavourite = async () => {
+    const nbId = menuNotebookId;
     handleMenuClose();
-    setImportNotice('Favorites screen coming soon.');
+    if (!nbId) return;
+    const next = !(menuNotebook?.favourite);
+    try {
+      await setFavourite(nbId, next);
+      setNotebooks((prev) => prev.map((n) =>
+        n.id === nbId ? { ...n, favourite: next } : n
+      ));
+      setImportNotice(next ? 'Added to favourites.' : 'Removed from favourites.');
+    } catch (err: any) {
+      setImportNotice(err.message || 'Failed to update favourite');
+    }
   };
 
   // ─── Sidebar ──────────────────────────────────────────────────────────────
@@ -344,51 +360,13 @@ export const FolderDetail: React.FC<FolderDetailProps> = ({ folderId, onSignOut 
             gap: { xs: 2, md: 3 }
           }}>
             {notebooks.map((nb) => (
-              <Card
+              <NotebookTile
                 key={nb.id}
-                sx={{
-                  borderRadius: 3,
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' },
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  height: { xs: 240, md: 280 },
-                  bgcolor: nb.coverColor,
-                  color: '#fff',
-                  position: 'relative',
-                }}
-                onClick={() => navigate('/Editor/' + nb.id)}
-              >
-                <Box sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ opacity: 0.8, textTransform: 'uppercase', fontSize: '10px', letterSpacing: 1 }}>
-                      Notebook
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 700, mt: 1, lineHeight: 1.2, wordBreak: 'break-word', fontSize: { xs: '16px', md: '20px' } }}>
-                      {nb.title}
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5, mt: 'auto' }}>
-                    <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                      {nb.pages.length} pages
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                      {nb.created_date ?? new Date(nb.createdAt).toLocaleDateString()}
-                    </Typography>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleMenuOpen(e, nb.id)}
-                      aria-label="Notebook options"
-                      sx={{ color: '#fff', opacity: 0.7, '&:hover': { opacity: 1, bgcolor: 'rgba(255,255,255,0.2)' } }}
-                    >
-                      <MoreVertical size={16} />
-                    </IconButton>
-                  </Box>
-                </Box>
-              </Card>
+                nb={nb}
+                onOpen={(id) => navigate('/Editor/' + id)}
+                onMenuOpen={handleMenuOpen}
+                menuActiveId={menuNotebookId}
+              />
             ))}
           </Box>
         )}
@@ -407,8 +385,10 @@ export const FolderDetail: React.FC<FolderDetailProps> = ({ folderId, onSignOut 
             Export
           </MenuItem>
           <MenuItem onClick={handleFavourite}>
-            <Box sx={{ mr: 1, color: 'text.secondary' }}><FolderIcon size={18} /></Box>
-            Mark as favourite
+            <Box sx={{ mr: 1, color: menuNotebook?.favourite ? 'warning.main' : 'text.secondary' }}>
+              <Star size={18} fill={menuNotebook?.favourite ? 'currentColor' : 'none'} />
+            </Box>
+            {menuNotebook?.favourite ? 'Remove from favourites' : 'Mark as favourite'}
           </MenuItem>
           <MenuItem onClick={(e) => menuNotebookId && handleAddToFolderOpen(e, menuNotebookId)}>
             <Box sx={{ mr: 1, color: 'text.secondary' }}><FolderIcon size={18} /></Box>

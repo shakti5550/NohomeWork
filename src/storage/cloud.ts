@@ -52,6 +52,7 @@ export interface Notebook {
   pages: Page[];
   version?: number;
   aiChat?: ChatMessage[];
+  favourite: boolean;
 }
 
 export interface ChatMessage {
@@ -155,6 +156,7 @@ export async function getAllNotebooks(): Promise<Notebook[]> {
     coverStyle: row.cover_style as Notebook['coverStyle'],
     version: row.version,
     aiChat: row.ai_chat ?? [],
+    favourite: row.is_favorite ?? false,
     pages: (pagesByNotebook.get(row.id) ?? []).map((p) => ({
       id: p.id,
       pageNumber: p.page_number,
@@ -196,6 +198,7 @@ export async function getNotebook(id: string): Promise<Notebook | undefined> {
     coverStyle: row.cover_style as Notebook['coverStyle'],
     version: row.version,
     aiChat: row.ai_chat ?? [],
+    favourite: row.is_favorite ?? false,
     pages: pageRows.map((p) => ({
       id: p.id,
       pageNumber: p.page_number,
@@ -256,6 +259,7 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
     updated_at: now,
     version: newVersion,
     ai_chat: notebook.aiChat ?? [],
+    is_favorite: notebook.favourite ?? false,
   });
   if (nbErr) throw nbErr;
 
@@ -295,6 +299,27 @@ export async function deleteNotebook(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Sets the favourite flag on a single notebook owned by the signed-in user.
+ * Throws if no matching notebook was updated. Returns the new flag value.
+ */
+export async function setFavourite(notebookId: string, favourite: boolean): Promise<boolean> {
+  ensureSignedIn();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+
+  const { data, error } = await supabase
+    .from('notebooks')
+    .update({ is_favorite: favourite, updated_at: Date.now() })
+    .eq('id', notebookId)
+    .eq('user_id', user.id)
+    .select('id');
+
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error('Notebook not found');
+  return favourite;
+}
+
 export async function createDefaultNotebook(title: string = 'Untitled Notebook'): Promise<Notebook> {
   const newNotebook: Notebook = {
     id: 'nb_' + Math.random().toString(36).substring(2, 9),
@@ -304,6 +329,7 @@ export async function createDefaultNotebook(title: string = 'Untitled Notebook')
     created_date: new Date().toISOString().slice(0, 10),
     coverColor: '#1976d2',
     coverStyle: 'classic',
+    favourite: false,
     pages: [
       {
         id: 'pg_' + Math.random().toString(36).substring(2, 9),
@@ -480,6 +506,7 @@ async function getNotebooksByIds(ids: string[]): Promise<Notebook[]> {
     coverStyle: row.cover_style as Notebook['coverStyle'],
     version: row.version,
     aiChat: row.ai_chat ?? [],
+    favourite: row.is_favorite ?? false,
     pages: (pagesByNotebook.get(row.id) ?? []).map((p) => ({
       id: p.id,
       pageNumber: p.page_number,

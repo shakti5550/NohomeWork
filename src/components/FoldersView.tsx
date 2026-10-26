@@ -5,7 +5,7 @@ import {
   DialogActions, TextField, Alert, useMediaQuery, useTheme, Paper
 } from '@mui/material';
 import {
-  BookOpen, Plus, Trash2, Folder as FolderIcon, Search, Menu as MenuIcon, X, Calendar
+  BookOpen, Plus, Trash2, Folder as FolderIcon, Search, Menu as MenuIcon, X, Calendar, Star
 } from 'lucide-react';
 import { Folder, getFolders, createFolder, deleteFolder } from '../storage/cloud';
 import { AppLogo } from './AppLogo';
@@ -110,8 +110,11 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton sx={{ borderRadius: 2, color: 'text.secondary' }}>
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><Search size={20} /></ListItemIcon>
+          <ListItemButton
+            onClick={() => navigate('/Favorites')}
+            sx={{ borderRadius: 2, color: 'text.secondary' }}
+          >
+            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><Star size={20} /></ListItemIcon>
             <ListItemText primary="Favorites" />
           </ListItemButton>
         </ListItem>
