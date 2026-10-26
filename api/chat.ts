@@ -214,18 +214,51 @@ export default async function handler(req: Request): Promise<Response> {
       );
     }
 
-    const result = await sendMessage(message, history || [], provider);
+    // Hard cap: the per-model timers bound the provider calls, but this is
+    // the last line of defense. If anything ever escapes those bounds, the
+    // request still returns a clean error instead of hanging until Vercel's
+    // own function timeout (which surfaces as a 504 with no message).
+    //
+    // The timer is hoisted so it can be cleared in finally — otherwise every
+    // settled request would leave a 65s timer scheduled.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const hardCap = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('AI request timed out — the service may be busy. Please try again.')),
+        65_000
+      );
+    });
 
-    return new Response(
-      JSON.stringify(result),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-        },
-      }
-    );
+    try {
+      const result = await Promise.race<ChatResult>([
+        sendMessage(message, history || [], provider),
+        hardCap,
+      ]);
+
+      return new Response(
+        JSON.stringify(result),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      );
+    } catch (err: any) {
+      return new Response(
+        JSON.stringify({ error: err.message || 'Internal server error' }),
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      );
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   } catch (err: any) {
     return new Response(
       JSON.stringify({ error: err.message || 'Internal server error' }),

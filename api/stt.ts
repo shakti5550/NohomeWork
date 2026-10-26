@@ -33,8 +33,8 @@ const PROVIDERS: SttProvider[] = [
     endpoint: 'https://openrouter.ai/api/v1/audio/transcriptions',
     auth: (key) => ({
       Authorization: `Bearer ${key}`,
-      HTTP-Referer: 'https://nohomework.com',
-      X-Title: 'NohomeWork',
+      'HTTP-Referer': 'https://nohomework.com',
+      'X-Title': 'NohomeWork',
     }),
     model: 'openai/whisper-large-v3',
   },
