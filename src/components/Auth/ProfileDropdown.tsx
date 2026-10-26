@@ -34,10 +34,9 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut, mod
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Dialog states
-  const [editNameOpen, setEditNameOpen] = useState(false);
-  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
-  const [editDobOpen, setEditDobOpen] = useState(false);
+  // Dialog states — a single "Edit Profile" dialog covers name, email,
+  // date of birth and password change together.
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
 
   // Form states
   const [editName, setEditName] = useState('');
@@ -76,22 +75,14 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut, mod
     setSuccess(null);
   };
 
-  const handleEditNameClick = () => {
+  const handleEditProfileClick = () => {
     handleMenuClose();
-    setEditNameOpen(true);
-  };
-
-  const handleChangePasswordClick = () => {
-    handleMenuClose();
-    setChangePasswordOpen(true);
+    setError(null);
+    setSuccess(null);
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
-  };
-
-  const handleEditDobClick = () => {
-    handleMenuClose();
-    setEditDobOpen(true);
+    setEditProfileOpen(true);
   };
 
   const handleSignOutClick = () => {
@@ -99,79 +90,50 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut, mod
     onSignOut();
   };
 
-  const handleSaveName = async () => {
-    if (!editName.trim()) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const { error } = await supabase.auth.updateUser({
-        data: { full_name: editName.trim() }
-      });
-      if (error) throw error;
-      setUser((prev: any) => prev ? { ...prev, user_metadata: { ...prev.user_metadata, full_name: editName.trim() } } : null);
-      setSuccess('Name updated successfully!');
-      setTimeout(() => setEditNameOpen(false), 1500);
-    } catch (err: any) {
-      setError(err.message || 'Failed to update name');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setError('Please fill in all fields');
+  // Combined save for the single Edit Profile dialog. Persists name and DOB
+  // always, and only attempts a password change when a new password is
+  // entered (verifying the current one first).
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      setError('Name cannot be empty');
       return;
     }
-    if (newPassword !== confirmPassword) {
+    if (newPassword && newPassword !== confirmPassword) {
       setError('New passwords do not match');
       return;
     }
-    if (newPassword.length < 6) {
+    if (newPassword && newPassword.length < 6) {
       setError('Password must be at least 6 characters');
       return;
     }
     setSaving(true);
     setError(null);
+    setSuccess(null);
     try {
-      // First verify current password by signing in
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) throw new Error('User email not found');
+      const update: any = { full_name: editName.trim(), dob: dob || undefined };
+      const { error: metaError } = await supabase.auth.updateUser({ data: update });
+      if (metaError) throw metaError;
 
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
-      });
-      if (signInError) throw new Error('Current password is incorrect');
+      if (newPassword) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) throw new Error('User email not found');
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: currentPassword,
+        });
+        if (signInError) throw new Error('Current password is incorrect');
+        const { error: pwError } = await supabase.auth.updateUser({ password: newPassword });
+        if (pwError) throw pwError;
+      }
 
-      // Update password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (updateError) throw updateError;
-
-      setSuccess('Password changed successfully!');
-      setTimeout(() => setChangePasswordOpen(false), 1500);
+      setUser((prev: any) => prev ? {
+        ...prev,
+        user_metadata: { ...prev.user_metadata, full_name: editName.trim(), dob: dob || undefined },
+      } : null);
+      setSuccess('Profile updated successfully!');
+      setTimeout(() => setEditProfileOpen(false), 1500);
     } catch (err: any) {
-      setError(err.message || 'Failed to change password');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveDob = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const { error } = await supabase.auth.updateUser({
-        data: { dob: dob || undefined }
-      });
-      if (error) throw error;
-      setUser((prev: any) => prev ? { ...prev, user_metadata: { ...prev.user_metadata, dob } } : null);
-      setSuccess('Date of birth updated!');
-      setTimeout(() => setEditDobOpen(false), 1500);
-    } catch (err: any) {
-      setError(err.message || 'Failed to update date of birth');
+      setError(err.message || 'Failed to update profile');
     } finally {
       setSaving(false);
     }
@@ -280,27 +242,11 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut, mod
 
           {/* Menu Items */}
           <MenuItem
-            onClick={handleEditNameClick}
+            onClick={handleEditProfileClick}
             sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
           >
             <Edit size={18} color="#64748b" />
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>Edit Name</Typography>
-          </MenuItem>
-
-          <MenuItem
-            onClick={handleChangePasswordClick}
-            sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
-          >
-            <Lock size={18} color="#64748b" />
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>Change Password</Typography>
-          </MenuItem>
-
-          <MenuItem
-            onClick={handleEditDobClick}
-            sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
-          >
-            <Calendar size={18} color="#64748b" />
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>Date of Birth</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>Edit Profile</Typography>
           </MenuItem>
 
           <Divider sx={{ my: 0.5 }} />
@@ -315,174 +261,122 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut, mod
         </MenuList>
       </Menu>
 
-      {/* Edit Name Dialog */}
+      {/* Edit Profile Dialog — single centered dialog for name, email,
+          date of birth and password change. */}
       <Dialog
-        open={editNameOpen}
-        onClose={() => setEditNameOpen(false)}
+        open={editProfileOpen}
+        onClose={() => setEditProfileOpen(false)}
         fullWidth
         maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: 3 } }}
+        PaperProps={{ sx: { borderRadius: 3, p: 0.5 } }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>Edit Name</DialogTitle>
-        <DialogContent sx={{ pt: 0 }}>
-          {error && <Alert severity="error" sx={{ mx: 3, mt: 2, mb: -1 }}>{error}</Alert>}
-          {success && <Alert severity="success" sx={{ mx: 3, mt: 2, mb: -1 }}>{success}</Alert>}
-          <TextField
-            autoFocus
-            fullWidth
-            label="Full Name"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            placeholder="Enter your name"
-            sx={{ mx: 3, mt: 2, mb: 1 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Box sx={{ mr: 1 }}>
+        <DialogTitle sx={{ fontWeight: 700, px: 3, pt: 2, pb: 1 }}>Edit Profile</DialogTitle>
+        <DialogContent sx={{ px: 3, pb: 1 }}>
+          {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
+          {success && <Alert severity="success" sx={{ mb: 1 }}>{success}</Alert>}
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
+            <TextField
+              autoFocus
+              fullWidth
+              label="Name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start" sx={{ mr: 0.5 }}>
                     <User size={20} color="#94a3b8" />
-                  </Box>
-                </InputAdornment>
-              )
-            }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ p: 2, px: 3 }}>
-          <Button onClick={() => setEditNameOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
-          <Button
-            onClick={handleSaveName}
-            variant="contained"
-            disabled={saving || !editName.trim()}
-            sx={{ textTransform: 'none', borderRadius: 2 }}
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+                  </InputAdornment>
+                )
+              }}
+            />
 
-      {/* Change Password Dialog */}
-      <Dialog
-        open={changePasswordOpen}
-        onClose={() => setChangePasswordOpen(false)}
-        fullWidth
-        maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: 3 } }}
-      >
-        <DialogTitle sx={{ fontWeight: 700 }}>Change Password</DialogTitle>
-        <DialogContent sx={{ pt: 0 }}>
-          {error && <Alert severity="error" sx={{ mx: 3, mt: 2, mb: -1 }}>{error}</Alert>}
-          {success && <Alert severity="success" sx={{ mx: 3, mt: 2, mb: -1 }}>{success}</Alert>}
+            <TextField
+              fullWidth
+              label="Email"
+              value={user?.email || ''}
+              InputProps={{ readOnly: true }}
+            />
 
-          <TextField
-            autoFocus
-            fullWidth
-            label="Current Password"
-            type={showCurrentPassword ? 'text' : 'password'}
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            sx={{ mx: 3, mt: 2, mb: 1.5 }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <MuiIconButton size="small" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
-                    {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </MuiIconButton>
-                </InputAdornment>
-              )
-            }}
-          />
+            <TextField
+              fullWidth
+              label="Date of Birth"
+              type="date"
+              value={dob}
+              onChange={(e) => setDob(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+            />
+          </Box>
 
-          <TextField
-            fullWidth
-            label="New Password"
-            type={showNewPassword ? 'text' : 'password'}
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            sx={{ mx: 3, mb: 1.5 }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <MuiIconButton size="small" onClick={() => setShowNewPassword(!showNewPassword)}>
-                    {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </MuiIconButton>
-                </InputAdornment>
-              )
-            }}
-            helperText="Minimum 6 characters"
-          />
+          <Divider sx={{ my: 2 }} />
 
-          <TextField
-            fullWidth
-            label="Confirm New Password"
-            type={showConfirmPassword ? 'text' : 'password'}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            sx={{ mx: 3, mb: 1 }}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <MuiIconButton size="small" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </MuiIconButton>
-                </InputAdornment>
-              )
-            }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ p: 2, px: 3 }}>
-          <Button onClick={() => setChangePasswordOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
-          <Button
-            onClick={handleChangePassword}
-            variant="contained"
-            disabled={saving}
-            sx={{ textTransform: 'none', borderRadius: 2 }}
-          >
-            {saving ? 'Changing...' : 'Change Password'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Edit DOB Dialog */}
-      <Dialog
-        open={editDobOpen}
-        onClose={() => setEditDobOpen(false)}
-        fullWidth
-        maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: 3 } }}
-      >
-        <DialogTitle sx={{ fontWeight: 700 }}>Date of Birth</DialogTitle>
-        <DialogContent sx={{ pt: 0 }}>
-          {error && <Alert severity="error" sx={{ mx: 3, mt: 2, mb: -1 }}>{error}</Alert>}
-          {success && <Alert severity="success" sx={{ mx: 3, mt: 2, mb: -1 }}>{success}</Alert>}
-          <TextField
-            autoFocus
-            fullWidth
-            label="Date of Birth"
-            type="date"
-            value={dob}
-            onChange={(e) => setDob(e.target.value)}
-            sx={{ mx: 3, mt: 2, mb: 1 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Box sx={{ mr: 1 }}>
-                    <Calendar size={20} color="#94a3b8" />
-                  </Box>
-                </InputAdornment>
-              )
-            }}
-            InputLabelProps={{ shrink: true }}
-          />
-          <Typography variant="caption" sx={{ mx: 3, color: 'text.secondary' }}>
-            This will be stored in your profile metadata.
+          <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary', fontWeight: 600 }}>
+            Change Password
+            <Typography component="span" sx={{ fontWeight: 400, ml: 0.5 }}>
+              (optional — leave blank to keep current)
+            </Typography>
           </Typography>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <TextField
+              fullWidth
+              label="Current Password"
+              type={showCurrentPassword ? 'text' : 'password'}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <MuiIconButton size="small" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
+                      {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </MuiIconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+
+            <TextField
+              fullWidth
+              label="New Password"
+              type={showNewPassword ? 'text' : 'password'}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              helperText="Minimum 6 characters"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <MuiIconButton size="small" onClick={() => setShowNewPassword(!showNewPassword)}>
+                      {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </MuiIconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+
+            <TextField
+              fullWidth
+              label="Confirm New Password"
+              type={showConfirmPassword ? 'text' : 'password'}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <MuiIconButton size="small" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </MuiIconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2, px: 3 }}>
-          <Button onClick={() => setEditDobOpen(false)} sx={{ textTransform: 'none' }}>Cancel</Button>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1, '& button': { textTransform: 'none', borderRadius: 2 } }}>
+          <Button onClick={() => setEditProfileOpen(false)}>Cancel</Button>
           <Button
-            onClick={handleSaveDob}
+            onClick={handleSaveProfile}
             variant="contained"
             disabled={saving}
-            sx={{ textTransform: 'none', borderRadius: 2 }}
           >
             {saving ? 'Saving...' : 'Save'}
           </Button>

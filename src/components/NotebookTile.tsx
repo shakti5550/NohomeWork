@@ -54,9 +54,6 @@ export const NotebookTile: React.FC<NotebookTileProps> = ({
           <Typography variant="caption" sx={{ opacity: 0.9 }}>
             {nb.pages.length} pages
           </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.7 }}>
-            {nb.created_date ?? new Date(nb.createdAt).toLocaleDateString()}
-          </Typography>
           <IconButton
             size="small"
             onClick={(e) => onMenuOpen(e, nb.id)}
