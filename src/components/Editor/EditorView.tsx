@@ -43,6 +43,10 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const [panning, setPanning] = useState(false);
   const [pageDialogOpen, setPageDialogOpen] = useState(false);
 
+  // Phone landscape only: collapse the floating button stacks into a single
+  // small arrow toggle at the bottom-right. The toggle itself never hides.
+  const [controlsCollapsed, setControlsCollapsed] = useState(false);
+
   // Pagination state
   const paginationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -144,7 +148,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // else keeps the existing spacing. Non-landscape layouts get 0 here since
   // their button placement uses a different mechanism.
   const canvasLeftPad = (!isTabletPortrait && !isShortViewport)
-    ? (isLandscape && isTabletMobile ? '60px' : '24px')
+    ? (isLandscape && isTabletMobile ? '0px' : '24px')
     : '0px';
 
   // Tablet held vertically: the top button row sits just below the status bar,
@@ -896,29 +900,56 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         // Phone in landscape: the full left stack is too tall for the narrow
         // screen, so the bottom three controls (Pages, AI Chat, Mic) move to
         // the right edge instead of overlapping the top ones.
+        // When controlsCollapsed is true, every floating button hides and
+        // only the small arrow toggle remains (bottom-right).
         <div className="nhw-float-stack" data-side="right">
-          {floatButtons.map((btn, i) => {
-            const Comp = btn.comp;
-            const isRightSide = i >= floatButtons.length - 3;
-            return (
-              <Comp
-                key={`nhw-float-${i}`}
-                {...btn.props}
-                style={{
-                  ...btn.props.style,
-                  position: 'fixed',
-                  // Right-side buttons: pin to the right edge, clear left.
-                  // Left-side buttons: keep their original left position.
-                  left: isRightSide ? undefined : btn.props.style?.left,
-                  right: isRightSide ? 0 : undefined,
-                  top: isRightSide
-                    ? `calc(${16 + (i - (floatButtons.length - 3)) * (48 + 12)}px)`
-                    : btn.props.style?.top,
-                  bottom: isRightSide ? undefined : btn.props.style?.bottom,
-                }}
-              />
-            );
-          })}
+          {floatButtons
+            .filter(() => !controlsCollapsed)
+            .map((btn, i) => {
+              const Comp = btn.comp;
+              const isRightSide = i >= floatButtons.length - 3;
+              return (
+                <Comp
+                  key={`nhw-float-${i}`}
+                  {...btn.props}
+                  style={{
+                    ...btn.props.style,
+                    position: 'fixed',
+                    // Right-side buttons: pin to the right edge, clear left.
+                    // Left-side buttons: keep their original left position.
+                    left: isRightSide ? undefined : btn.props.style?.left,
+                    right: isRightSide ? 0 : undefined,
+                    top: isRightSide
+                      ? `calc(${16 + (i - (floatButtons.length - 3)) * (48 + 12)}px)`
+                      : btn.props.style?.top,
+                    bottom: isRightSide ? undefined : btn.props.style?.bottom,
+                  }}
+                />
+              );
+            })}
+          <Tooltip title={controlsCollapsed ? 'Show controls' : 'Hide controls'} placement="left">
+            <IconButton
+              onClick={() => setControlsCollapsed((c) => !c)}
+              sx={{
+                position: 'fixed',
+                right: 0,
+                bottom: 0,
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                bgcolor: mode === 'dark' ? '#1e293b' : '#ffffff',
+                color: mode === 'dark' ? '#f8fafc' : '#1e293b',
+                border: '1px solid',
+                borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                zIndex: 100,
+                m: 0,
+                '&:hover': { transform: 'scale(1.1)' },
+              }}
+            >
+              {controlsCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+            </IconButton>
+          </Tooltip>
         </div>
       ) : isTabletPortrait ? (
         // Tablet held vertically: a horizontal top row keeps the controls
@@ -1050,10 +1081,14 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             // Phones (portrait & landscape): full-bleed sheet, fills top to
             // bottom so the empty margins disappear. iPads and laptops keep
             // their existing constrained layout — this branch is phone-only.
-            width: isPhone ? '100%'
+            // Phone landscape: full-bleed left to right. Portrait has no right
+            // stack and stays full-bleed. iPads and laptops untouched.
+            width: isPhoneLandscape ? '100%'
+              : isPhone ? '100%'
               : isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px`
               : '100%',
-            maxWidth: isPhone ? '100%'
+            maxWidth: isPhoneLandscape ? '100%'
+              : isPhone ? '100%'
               : isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px`
               : isTabletPortrait ? '100vw'
                 : { xs: '98vw', sm: '94vw', md: '800px' },
