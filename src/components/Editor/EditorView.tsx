@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import {
   ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight,
-  Bot, X, Send, Pencil, Hand
+  Bot, X, Send, Pencil, Hand, LayoutGrid
 } from 'lucide-react';
 import { Notebook, Page, Stroke, TextAnnotation, saveNotebook, ChatMessage } from '../../storage/cloud';
 import { ChatButton } from '../AIChat/ChatButton';
@@ -41,6 +41,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const [paginationVisible, setPaginationVisible] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [panning, setPanning] = useState(false);
+  const [pageDialogOpen, setPageDialogOpen] = useState(false);
 
   // Pagination state
   const paginationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,6 +74,19 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
   const currentPage: Page = notebook.pages[currentPageIndex] || notebook.pages[0];
 
+  // Cache for page thumbnails: keyed by page id + template + the notebook's
+  // updatedAt (which bumps on every stroke/text/template save), so a tile is
+  // only re-rendered when that page's content actually changes.
+  const thumbCacheRef = useRef<Map<string, string>>(new Map());
+  const getThumbnail = (page: Page): string => {
+    const key = `${page.id}|${page.template}|${notebook.updatedAt}`;
+    const cached = thumbCacheRef.current.get(key);
+    if (cached) return cached;
+    const data = renderPageThumbnail(page, 240);
+    thumbCacheRef.current.set(key, data);
+    return data;
+  };
+
   // Canvas area measurement
   const [canvasAreaSize, setCanvasAreaSize] = useState({ width: 0, height: 0 });
   useEffect(() => {
@@ -100,6 +114,11 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // compact styling (black icons, back-button-style floating buttons) and a
   // taller paper so the extra top space is used.
   const isTabletMobile = useMediaQuery('(max-width: 900px)');
+
+  // Phones (portrait or landscape) get a full-screen page sheet. Anything
+  // wider/taller than this (laptops, tablets in either orientation) gets a
+  // small centered dialog with the page tiles.
+  const isPhone = useMediaQuery('(max-width: 600px), (max-height: 600px)');
 
   // Short viewports (phones in landscape, split windows, short tablets) can't
   // fit the full vertical button stack without clipping the bottom button.
@@ -198,6 +217,14 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       showPagination();
     }
   }, [currentPageIndex, notebook.pages.length, showPagination]);
+
+  // Jump to a specific page from the page-selection dialog.
+  const goToPage = useCallback((index: number) => {
+    if (index < 0 || index >= notebook.pages.length) return;
+    setCurrentPageIndex(index);
+    showPagination();
+    setPageDialogOpen(false);
+  }, [notebook.pages.length, showPagination]);
 
   // Touch/swipe handling
   useEffect(() => {
@@ -657,6 +684,93 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     </Tooltip>
   );
 
+  // Faint paper-style preview drawn on each page tile in the page-selection
+  // dialog so users can tell ruled/grid/dotted/blank tiles apart at a glance.
+  const tileBackground = (tpl: Template): string => {
+    const bg = '#ffffff';
+    const line = '#e2e8f0';
+    const dot = '#cbd5e1';
+    switch (tpl) {
+      case 'ruled':
+        return `repeating-linear-gradient(to bottom, ${line} 0 1px, transparent 1px 14px)`;
+      case 'grid':
+        return `repeating-linear-gradient(to right, ${line} 0 1px, transparent 1px 14px), repeating-linear-gradient(to bottom, ${line} 0 1px, transparent 1px 14px)`;
+      case 'dotted':
+        return `radial-gradient(circle, ${dot} 1.5px, transparent 1.5px) 0 0 / 14px 14px`;
+      default:
+        return bg;
+    }
+  };
+
+  // Renders a miniature preview of a page's actual content (strokes + text
+  // annotations) onto a square canvas, scaled to fit with a small margin.
+  // Empty pages return an empty string so callers fall back to the plain
+  // template preview. Used by the page-selection dialog tiles.
+  const renderPageThumbnail = (page: Page, size: number): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    // Paper template as the base layer.
+    drawTemplate(ctx, size, size, page.template);
+
+    const anns = page.textAnnotations ?? [];
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let hasContent = false;
+    const touch = (x: number, y: number) => {
+      hasContent = true;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    };
+    for (const stroke of page.strokes) {
+      for (const p of stroke.points) touch(p.x, p.y);
+    }
+    for (const a of anns) {
+      touch(a.x, a.y);
+      // Approximate the text block's extent so it isn't cropped off.
+      const estW = Math.min(a.text.length * a.fontSize * 0.5, 600);
+      const estH = a.fontSize * 1.4 * Math.ceil(a.text.length / 20) + 8;
+      touch(a.x + estW, a.y + estH);
+    }
+    if (!hasContent) return canvas.toDataURL();
+
+    const bw = maxX - minX || 1;
+    const bh = maxY - minY || 1;
+    const pad = size * 0.1;
+    const scale = Math.min((size - pad * 2) / bw, (size - pad * 2) / bh);
+    const ox = (size - bw * scale) / 2 - minX * scale;
+    const oy = (size - bh * scale) / 2 - minY * scale;
+    ctx.setTransform(scale, 0, 0, scale, ox, oy);
+
+    for (const stroke of page.strokes) drawStroke(ctx, stroke);
+    for (const a of anns) {
+      ctx.save();
+      ctx.font = `${a.fontSize}px ${a.font}`;
+      ctx.fillStyle = a.color;
+      ctx.textBaseline = 'top';
+      let line = '';
+      let y = a.y;
+      for (const word of a.text.split(' ')) {
+        const test = line.length === 0 ? word : line + ' ' + word;
+        if (ctx.measureText(test).width > 260 && line.length > 0) {
+          ctx.fillText(line, a.x, y);
+          line = word;
+          y += a.fontSize * 1.4;
+        } else {
+          line = test;
+        }
+      }
+      if (line.length > 0) ctx.fillText(line, a.x, y);
+      ctx.restore();
+    }
+
+    return canvas.toDataURL();
+  };
+
   // Force immediate save before navigating away
   const handleBack = useCallback(async () => {
     // Flush any pending debounced save immediately
@@ -744,6 +858,15 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           color: mode === 'dark' ? '#f8fafc' : '#64748b',
           borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
         },
+      },
+    },
+    {
+      comp: FloatingBtn,
+      props: {
+        onClick: () => setPageDialogOpen(true),
+        tooltip: 'Pages',
+        icon: <LayoutGrid size={20} />,
+        style: { bottom: 136, left: 6 },
       },
     },
     {
@@ -1209,6 +1332,98 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                 </Button>
               ))}
             </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
+
+      {/* Page-selection dialog. Phones get a full-screen sheet; laptops,
+          tablets (landscape + portrait) get a small centered dialog. The
+          tiles are laid out row-major: page 1, 2, 3, 4 across, then 5, 6… below. */}
+      <Dialog
+        open={pageDialogOpen}
+        onClose={() => setPageDialogOpen(false)}
+        fullScreen={isPhone}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: isPhone ? 0 : 3,
+            bgcolor: mode === 'dark' ? '#1e293b' : '#ffffff',
+            color: 'text.primary',
+            margin: isPhone ? 0 : 'auto',
+            height: isPhone ? '100%' : 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>Pages</Typography>
+          <IconButton size="small" onClick={() => setPageDialogOpen(false)}>
+            <X size={18} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ flex: 1, overflowY: 'auto', py: 2 }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
+              gap: 1.5,
+              p: 1,
+            }}
+          >
+            {notebook.pages.map((page, idx) => {
+              const isActive = idx === currentPageIndex;
+              return (
+                <Box
+                  key={page.id}
+                  onClick={() => goToPage(idx)}
+                  sx={{
+                    aspectRatio: '1 / 1',
+                    borderRadius: 1.5,
+                    border: isActive ? '3px solid #2563eb' : '1px solid',
+                    borderColor: isActive ? '#2563eb' : 'divider',
+                    // Real miniature of the page's content when it has any;
+                    // plain template preview otherwise. `contain` keeps the
+                    // whole preview inside the square tile.
+                    backgroundImage: `url(${getThumbnail(page)})`,
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                    backgroundColor: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'center',
+                    pb: 0.6,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    transition: 'all 0.15s ease',
+                    transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                    boxShadow: isActive ? '0 4px 12px rgba(37,99,235,0.35)' : 'none',
+                    '&:hover': {
+                      transform: 'scale(1.08)',
+                      borderColor: isActive ? '#2563eb' : '#94a3b8',
+                    },
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 700,
+                      color: isActive ? '#2563eb' : 'text.primary',
+                      bgcolor: isActive ? 'rgba(37,99,235,0.12)' : 'rgba(0,0,0,0.06)',
+                      px: 0.8,
+                      py: 0.2,
+                      borderRadius: 1,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {idx + 1}
+                  </Typography>
+                </Box>
+              );
+            })}
           </Box>
         </DialogContent>
       </Dialog>
