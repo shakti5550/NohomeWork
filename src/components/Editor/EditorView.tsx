@@ -795,7 +795,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     onBack();
   }, [onBack]);
 
-  // The six floating controls, in vertical order. On short viewports the
+  // The floating controls, in vertical order. On short viewports the
   // stack collapses into a horizontal bottom row so nothing is clipped off.
   const floatButtons: { comp: React.ElementType; props: Record<string, any> }[] = [
     {
@@ -847,20 +847,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       },
     },
     {
-      comp: DictationButton,
-      props: {
-        onDictate: handleDictate,
-        onInterim: handleInterim,
-        lastPointerPos: lastPointerPos,
-        style: {
-          bottom: 16, left: 6,
-          backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff',
-          color: mode === 'dark' ? '#f8fafc' : '#64748b',
-          borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
-        },
-      },
-    },
-    {
       comp: FloatingBtn,
       props: {
         onClick: () => setPageDialogOpen(true),
@@ -877,13 +863,29 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         style: { bottom: 76, left: 6 },
       },
     },
+    {
+      comp: DictationButton,
+      props: {
+        onDictate: handleDictate,
+        onInterim: handleInterim,
+        lastPointerPos: lastPointerPos,
+        style: {
+          bottom: 16, left: 6,
+          backgroundColor: mode === 'dark' ? '#1e293b' : '#ffffff',
+          color: mode === 'dark' ? '#f8fafc' : '#64748b',
+          borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+        },
+      },
+    },
   ];
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
       {/* Single left-side floating button stack — 48px buttons, 12px gaps,
           16px from the left edge. Order top→bottom:
-          Back → Tools → Add Page → Delete → Mic → AI Chat. */}
+          Back → Tools → Add Page → Delete → Hand → Pages → AI Chat → Mic.
+          On iPad portrait the last three (Pages, Chat, Mic) move to the
+          right end of the top row, Mic rightmost. */}
       {isTabletPortrait ? (
         // Tablet held vertically: a horizontal top row keeps the controls
         // clear of the status bar and the top of the paper, in the same
@@ -899,7 +901,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                   ...btn.props.style,
                   position: 'fixed',
                   top: 15,
-                  ...(i >= floatButtons.length - 2
+                  ...(i >= floatButtons.length - 3
                     ? { right: `calc(16px + ${(floatButtons.length - 1 - i)} * (48px + 12px))`, left: 'auto' }
                     : { left: `calc(16px + ${i} * (48px + 12px))` })
                 }}
