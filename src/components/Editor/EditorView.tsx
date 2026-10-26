@@ -1050,10 +1050,15 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
             // Phones (portrait & landscape): full-bleed sheet, fills top to
             // bottom so the empty margins disappear. iPads and laptops keep
             // their existing constrained layout — this branch is phone-only.
-            width: isPhone ? '100%'
+            // In phone landscape the right-side button stack needs room, so
+            // the paper stops short of the right edge; portrait has no right
+            // stack and stays full-bleed.
+            width: isPhoneLandscape ? 'calc(100% - 72px)'
+              : isPhone ? '100%'
               : isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px`
               : '100%',
-            maxWidth: isPhone ? '100%'
+            maxWidth: isPhoneLandscape ? 'calc(100% - 72px)'
+              : isPhone ? '100%'
               : isLandscape && pageMaxWidth > 0 ? `${pageMaxWidth}px`
               : isTabletPortrait ? '100vw'
                 : { xs: '98vw', sm: '94vw', md: '800px' },
