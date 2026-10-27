@@ -65,6 +65,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const [chatInput, setChatInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  // Selection state for "insert into page" feature
+  const [selectedText, setSelectedText] = useState<{ idx: number; text: string } | null>(null);
 
   // Drawing refs
   const isDrawingRef = useRef(false);
@@ -644,6 +646,115 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     saveNotebook(updated);
   }, [onUpdateNotebook]);
 
+  // Detect text selection in AI messages
+  const handleSelection = useCallback(() => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.toString().trim().length === 0) {
+      setSelectedText(null);
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    // Find which message box contains the selection
+    const container = range.commonAncestorContainer.parentElement;
+    if (!container) {
+      // Selection is outside any message box — clear stale state so the
+      // previous Insert control doesn't insert old text.
+      setSelectedText(null);
+      return;
+    }
+    const msgBox = container.closest('[data-msg-idx]');
+    if (!msgBox) {
+      // Cross-message selection — no single message owns it. Clear stale
+      // state rather than silently reusing the previous selection.
+      setSelectedText(null);
+      return;
+    }
+    const idx = Number(msgBox.getAttribute('data-msg-idx'));
+    setSelectedText({ idx, text: sel.toString().trim() });
+  }, []);
+
+  // Measure text height offline using a hidden canvas — mirrors wrapText
+  // used by drawTextAnnotation so the layout Y position is accurate.
+  // Mirror the wrap width that drawTextAnnotation actually uses, so the
+  // measured height matches what gets painted. Without this, a narrow page
+  // could measure at 300px and place the next annotation over the previous.
+  const getAnnotationWrapWidth = (ann: TextAnnotation, canvasWidth: number): number => {
+    const leftMargin = 8;
+    const rightMargin = 24;
+    const clampedX = Math.max(leftMargin, Math.min(ann.x, canvasWidth - rightMargin - 1));
+    return Math.max(0, canvasWidth - clampedX - rightMargin);
+  };
+
+  const measureTextBlockHeight = useCallback((_text: string, fontSize: number, maxWidth: number): number => {
+    const lineH = fontSize * 1.4;
+    const offscreen = document.createElement('canvas');
+    const ctx = offscreen.getContext('2d');
+    if (!ctx) return lineH;
+    ctx.font = `${fontSize}px system-ui`;
+    const lines = wrapText(ctx, _text, maxWidth, fontSize, 'system-ui');
+    return lineH * lines.length;
+  }, [wrapText]);
+
+  // Compute a non-overlapping position for a new annotation, stacking below
+  // existing ones so multiple insertions don't draw over each other.
+  const getNextAnnotationPos = useCallback((text: string): { x: number; y: number } => {
+    const page = notebookRef.current.pages[pageIndexRef.current];
+    const existing = page.textAnnotations ?? [];
+    if (existing.length === 0) return { x: 0, y: 0 };
+
+    // Stack vertically below the last annotation, accounting for its rendered
+    // text height. Using the same wrapText logic as drawTextAnnotation so the
+    // position is accurate even for multi-line annotations. Must use the same
+    // wrap width (canvasWidth - clampedX - rightMargin) that drawTextAnnotation
+    // uses. Use the actual rendered canvas width (from getBoundingClientRect)
+    // rather than canvasAreaSize.width, because canvasAreaSize can exceed the
+    // paper's capped width on wide viewports — text would measure as one line
+    // but render as two, causing the next annotation to start inside the
+    // previous one.
+    const last = existing[existing.length - 1];
+    const canvas = canvasRef.current;
+    const canvasWidth = canvas ? canvas.getBoundingClientRect().width : (canvasAreaSize.width || 300);
+    const wrapWidth = getAnnotationWrapWidth(last, canvasWidth);
+    const lastHeight = measureTextBlockHeight(last.text, last.fontSize, wrapWidth);
+    return { x: last.x, y: last.y + lastHeight + 8 };
+  }, [measureTextBlockHeight, getAnnotationWrapWidth]);
+
+  // Insert selected text onto the canvas
+  const handleInsert = useCallback(() => {
+    if (!selectedText) return;
+    const { text } = selectedText;
+    const pos = getNextAnnotationPos(text);
+    const ann: TextAnnotation = {
+      id: 'ta_' + Math.random().toString(36).substring(2, 9),
+      x: pos.x,
+      y: pos.y,
+      text,
+      font: 'system-ui',
+      fontSize: 16,
+      color: '#1e293b',
+      createdAt: Date.now(),
+    };
+    const nb = notebookRef.current;
+    const pageIdx = pageIndexRef.current;
+    const page = nb.pages[pageIdx];
+    const updatedPages = [...nb.pages];
+    updatedPages[pageIdx] = { ...page, textAnnotations: [...(page.textAnnotations ?? []), ann] };
+    updateCurrentNotebook(updatedPages, 0);
+    setSelectedText(null);
+  }, [selectedText, getNextAnnotationPos]);
+
+  // Keyboard shortcut: Ctrl/Cmd+Shift+I to insert selected chat text
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I' && selectedText) {
+        e.preventDefault();
+        handleInsert();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedText, handleInsert]);
+
   const handleSendMessage = useCallback(async () => {
     const text = chatInput.trim();
     if (!text || isSending) return;
@@ -1131,7 +1242,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       <Drawer
         anchor="right"
         open={chatOpen}
-        onClose={() => setChatOpen(false)}
+        onClose={() => { setChatOpen(false); setSelectedText(null); }}
         PaperProps={{
           sx: {
             width: '100%',
@@ -1154,7 +1265,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           </Typography>
           <Tooltip title="Close">
             <IconButton
-              onClick={() => setChatOpen(false)}
+              onClick={() => { setChatOpen(false); setSelectedText(null); }}
               sx={{
                 width: 40,
                 height: 40,
@@ -1182,6 +1293,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           {chatMessages.map((msg, idx) => (
             <Box
               key={idx}
+              data-msg-idx={idx}
               sx={{
                 maxWidth: '85%',
                 p: 1.2,
@@ -1194,7 +1306,10 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                 wordBreak: 'break-word',
                 fontSize: '14px',
                 lineHeight: 1.5,
+                position: 'relative',
+                userSelect: 'text',
               }}
+              onMouseUp={handleSelection}
             >
               {msg.content}
             </Box>
@@ -1207,6 +1322,51 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           {chatError && (
             <Box sx={{ p: 1.2, borderRadius: 2, bgcolor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', fontSize: '13px' }}>
               {chatError}
+            </Box>
+          )}
+          {selectedText && (
+            <Box
+              sx={{
+                alignSelf: 'flex-start',
+                display: 'flex',
+                gap: 0.5,
+                pt: 0.5,
+              }}
+            >
+              <Tooltip title="Insert into page">
+                <IconButton
+                  size="small"
+                  onClick={handleInsert}
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    bgcolor: '#2563eb',
+                    color: '#fff',
+                    '&:hover': { bgcolor: '#1d4ed8' },
+                  }}
+                >
+                  <Send size={14} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Discard">
+                <IconButton
+                  size="small"
+                  onClick={() => setSelectedText(null)}
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    bgcolor: 'background.paper',
+                    color: 'text.secondary',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    '&:hover': { bgcolor: 'action.hover' },
+                  }}
+                >
+                  <X size={14} />
+                </IconButton>
+              </Tooltip>
             </Box>
           )}
         </Box>
