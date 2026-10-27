@@ -64,27 +64,24 @@ function pickProvider(): SttProvider | null {
   return null;
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, multipart/form-data',
-        'Access-Control-Max-Age': '86400',
-      },
-    });
-  }
+// Vercel modern fetch-style API — named exports for each HTTP method.
+// Using `export default` with the legacy (req, res) signature causes the
+// returned Response to be silently ignored, which is why the function
+// hung for 300s instead of returning a 500. Named exports fix that.
 
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
+export async function OPTIONS(req: Request): Promise<Response> {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, multipart/form-data',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
 
+export async function POST(req: Request): Promise<Response> {
   try {
     const provider = pickProvider();
     if (!provider) {
