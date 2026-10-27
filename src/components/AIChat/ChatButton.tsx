@@ -1,6 +1,6 @@
 import React from 'react';
 import { IconButton, Tooltip, useMediaQuery, useTheme } from '@mui/material';
-import { Bot } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useThemeMode } from '../../ThemeContext';
 
 interface ChatButtonProps {
@@ -19,10 +19,10 @@ export const ChatButton: React.FC<ChatButtonProps> = ({ onClick, isOpen, style }
   const { mode } = useThemeMode();
 
   return (
-    <Tooltip title={isOpen ? 'Close AI chat' : 'Chat with AI assistant'} placement="left">
+    <Tooltip title={isOpen ? 'Close Homie' : 'Chat with Homie'} placement="left">
       <IconButton
         onClick={onClick}
-        aria-label="AI chat"
+        aria-label="Homie chat"
         sx={{
           position: 'fixed',
           boxSizing: 'border-box',
@@ -59,7 +59,7 @@ export const ChatButton: React.FC<ChatButtonProps> = ({ onClick, isOpen, style }
           ...style
         }}
       >
-        <Bot size={isMobile ? 22 : 26} />
+        <Sparkles size={isMobile ? 22 : 26} />
       </IconButton>
     </Tooltip>
   );

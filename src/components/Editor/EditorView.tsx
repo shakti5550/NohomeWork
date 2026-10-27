@@ -1149,17 +1149,24 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         slotProps={{ backdrop: { sx: { backdropFilter: 'blur(2px)' } } }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-              <Bot size={18} />
-            </Box>
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>AI Assistant</Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>Ask anything about your notes</Typography>
-            </Box>
-          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.05rem', letterSpacing: '0.02em' }}>
+            Homie
+          </Typography>
           <Tooltip title="Close">
-            <IconButton size="small" onClick={() => setChatOpen(false)}>
+            <IconButton
+              onClick={() => setChatOpen(false)}
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                bgcolor: mode === 'dark' ? '#1e293b' : '#ffffff',
+                color: mode === 'dark' ? '#f8fafc' : '#1e293b',
+                border: '1px solid',
+                borderColor: mode === 'dark' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                '&:hover': { transform: 'scale(1.08)', bgcolor: mode === 'dark' ? '#334155' : '#f1f5f9' },
+              }}
+            >
               <X size={18} />
             </IconButton>
           </Tooltip>
@@ -1204,8 +1211,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           )}
         </Box>
         <Box sx={{ p: 1.5, borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-          <Box sx={{ flex: 1 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <TextField
+              fullWidth
               multiline
               maxRows={4}
               size="small"
