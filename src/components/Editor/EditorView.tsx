@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
 import {
   Box, IconButton, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions,
   Button, Typography, Slider, Drawer, TextField, useMediaQuery
@@ -1324,52 +1324,59 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
               {chatError}
             </Box>
           )}
-          {selectedText && (
-            <Box
-              sx={{
-                alignSelf: 'flex-start',
-                display: 'flex',
-                gap: 0.5,
-                pt: 0.5,
-              }}
-            >
-              <Tooltip title="Insert into page">
-                <IconButton
-                  size="small"
-                  onClick={handleInsert}
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: '50%',
-                    bgcolor: '#2563eb',
-                    color: '#fff',
-                    '&:hover': { bgcolor: '#1d4ed8' },
-                  }}
-                >
-                  <Send size={14} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Discard">
-                <IconButton
-                  size="small"
-                  onClick={() => setSelectedText(null)}
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: '50%',
-                    bgcolor: 'background.paper',
-                    color: 'text.secondary',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    '&:hover': { bgcolor: 'action.hover' },
-                  }}
-                >
-                  <X size={14} />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          )}
         </Box>
+        {/* Persistent action bar — always visible above the input so it can't scroll out of view */}
+        {selectedText && (
+          <Box
+            sx={{
+              px: 1.5,
+              py: 0.5,
+              borderTop: '1px solid',
+              borderColor: 'divider',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.75,
+            }}
+          >
+            <Typography variant="caption" sx={{ flex: 1, minWidth: 0, color: 'text.secondary', pr: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {selectedText.text.slice(0, 40)}{selectedText.text.length > 40 ? '…' : ''}
+            </Typography>
+            <Tooltip title="Insert into page (Ctrl+Shift+I)">
+              <IconButton
+                size="small"
+                onClick={handleInsert}
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  bgcolor: '#2563eb',
+                  color: '#fff',
+                  '&:hover': { bgcolor: '#1d4ed8' },
+                }}
+              >
+                <Send size={14} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Discard">
+              <IconButton
+                size="small"
+                onClick={() => setSelectedText(null)}
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  bgcolor: 'background.paper',
+                  color: 'text.secondary',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  '&:hover': { bgcolor: 'action.hover' },
+                }}
+              >
+                <X size={14} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        )}
         <Box sx={{ p: 1.5, borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1, alignItems: 'flex-end' }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <TextField
