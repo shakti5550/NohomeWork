@@ -1,21 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
-  Typography, Button, IconButton, Menu as MuiMenu, MenuItem, Dialog, DialogTitle,
+  Box, Drawer, Menu as MuiMenu, MenuItem, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Alert, useMediaQuery,
-  useTheme, Select, FormControl, InputLabel, OutlinedInput, CircularProgress
+  useTheme, Typography, IconButton, Button, Select, FormControl, InputLabel, OutlinedInput, CircularProgress
 } from '@mui/material';
 import {
-  BookOpen, Plus, Trash2, Star, Folder, Search, Menu as MenuIcon, X, Download,
+  Trash2, Search, Menu as MenuIcon, Download, Plus, Star, Folder,
   ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook, createFolder, getFolders, addNotebookToFolder, setFavourite } from '../storage/cloud';
-import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { NotebookTile } from './NotebookTile';
 import { Toast } from './Toast';
+import { AppSidebar } from './AppSidebar';
 
 // ─── Date grouping helpers ─────────────────────────────────────────────────
 // Notebooks are grouped by the calendar day they were created on, newest
@@ -78,11 +77,13 @@ function groupByDate(notebooks: Notebook[]): DateGroup[] {
 }
 
 interface LibraryViewProps {
-  onOpenNotebook: (notebookId: string) => void;
+  onOpenNotebook: (notebookId: string, returnTo?: string) => void;
   onSignOut: () => void;
+  /** Route the editor should return to on Back; defaults to /Home. */
+  returnTo?: string;
 }
 
-export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSignOut }) => {
+export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSignOut, returnTo }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -366,108 +367,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
   const menuNotebook = notebooks.find((n) => n.id === menuNotebookId) ?? null;
 
   const SidebarContent = (
-    <Box sx={{
-      width: 260,
-      bgcolor: 'background.paper',
-      color: 'text.primary',
-      height: isMobile ? '100%' : '100vh',
-      p: 2,
-      display: 'flex',
-      flexDirection: 'column',
-      boxSizing: 'border-box',
-      borderRight: isMobile ? 'none' : '1px solid',
-      borderColor: 'divider'
-    }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, px: 1 }}>
-        <AppLogo size={32} />
-        {isMobile && (
-          <IconButton onClick={() => setIsSidebarOpen(false)} size="small" color="inherit">
-            <X size={20} />
-          </IconButton>
-        )}
-      </Box>
-
-      <List sx={{ flexGrow: 1, gap: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        <ListItem disablePadding>
-          <ListItemButton
-            selected={location.pathname === '/Home'}
-            onClick={() => navigate('/Home')}
-            sx={{
-              borderRadius: 2,
-              bgcolor: location.pathname === '/Home'
-                ? (mode === 'dark' ? 'rgba(37, 99, 235, 0.25)' : '#eff6ff')
-                : 'transparent',
-              color: location.pathname === '/Home'
-                ? (mode === 'dark' ? '#60a5fa' : '#1d4ed8')
-                : 'text.secondary',
-              '&.Mui-selected': {
-                bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.35)' : '#eff6ff',
-              }
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><BookOpen size={20} /></ListItemIcon>
-            <ListItemText primary="Documents" primaryTypographyProps={{ fontWeight: 600 }} />
-          </ListItemButton>
-        </ListItem>
-        <ListItem disablePadding>
-          <ListItemButton
-            selected={location.pathname === '/Favorites'}
-            onClick={() => navigate('/Favorites')}
-            sx={{
-              borderRadius: 2,
-              bgcolor: location.pathname === '/Favorites'
-                ? (mode === 'dark' ? 'rgba(37, 99, 235, 0.25)' : '#eff6ff')
-                : 'transparent',
-              color: location.pathname === '/Favorites'
-                ? (mode === 'dark' ? '#60a5fa' : '#1d4ed8')
-                : 'text.secondary',
-              '&.Mui-selected': {
-                bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.35)' : '#eff6ff',
-              }
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><Star size={20} /></ListItemIcon>
-            <ListItemText primary="Favorites" />
-          </ListItemButton>
-        </ListItem>
-        <ListItem disablePadding>
-          <ListItemButton
-            selected={location.pathname.startsWith('/Folders')}
-            onClick={() => navigate('/Folders')}
-            sx={{
-              borderRadius: 2,
-              bgcolor: location.pathname.startsWith('/Folders')
-                ? (mode === 'dark' ? 'rgba(37, 99, 235, 0.25)' : '#eff6ff')
-                : 'transparent',
-              color: location.pathname.startsWith('/Folders')
-                ? (mode === 'dark' ? '#60a5fa' : '#1d4ed8')
-                : 'text.secondary',
-              '&.Mui-selected': {
-                bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.35)' : '#eff6ff',
-              }
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><Folder size={20} /></ListItemIcon>
-            <ListItemText primary="Folders" />
-          </ListItemButton>
-        </ListItem>
-      </List>
-
-      <Box sx={{ pt: 2, pb: 1 }}>
-        <Button
-          variant="contained"
-          fullWidth
-          startIcon={<Plus size={18} />}
-          onClick={() => {
-            setNewDialogOpen(true);
-            if (isMobile) setIsSidebarOpen(false);
-          }}
-          sx={{ py: 1.2, borderRadius: 2, textTransform: 'none', fontWeight: 600, boxShadow: 'none' }}
-        >
-          New Notebook
-        </Button>
-      </Box>
-    </Box>
+    <AppSidebar
+      isMobile={isMobile}
+      onClose={() => setIsSidebarOpen(false)}
+      newButtonLabel="New Notebook"
+      onNewClick={() => {
+        setNewDialogOpen(true);
+        if (isMobile) setIsSidebarOpen(false);
+      }}
+    />
   );
 
   return (
@@ -628,6 +536,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
                 key={nb.id}
                 nb={nb}
                 onOpen={onOpenNotebook}
+                returnTo={returnTo}
                 onMenuOpen={handleMenuOpen}
                 menuActiveId={menuNotebookId}
               />
@@ -690,6 +599,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
                           key={nb.id}
                           nb={nb}
                           onOpen={onOpenNotebook}
+                returnTo={returnTo}
                           onMenuOpen={handleMenuOpen}
                           menuActiveId={menuNotebookId}
                         />

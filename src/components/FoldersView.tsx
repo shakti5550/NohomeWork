@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
-  Typography, Button, IconButton, Dialog, DialogTitle, DialogContent,
+  Box, Drawer, Typography, Button, IconButton, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, Alert, useMediaQuery, useTheme, Paper
 } from '@mui/material';
 import {
-  BookOpen, Plus, Trash2, Folder as FolderIcon, Search, Menu as MenuIcon, X, Calendar, Star
+  Trash2, Folder as FolderIcon, Search, Menu as MenuIcon, Calendar
 } from 'lucide-react';
 import { Folder, getFolders, createFolder, deleteFolder } from '../storage/cloud';
-import { AppLogo } from './AppLogo';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
 import { useNavigate } from 'react-router-dom';
 import { Toast } from './Toast';
+import { AppSidebar } from './AppSidebar';
 
 interface FoldersViewProps {
   onSignOut: () => void;
@@ -78,76 +77,15 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
   );
 
   const SidebarContent = (
-    <Box sx={{
-      width: 260,
-      bgcolor: 'background.paper',
-      color: 'text.primary',
-      height: isMobile ? '100%' : '100vh',
-      p: 2,
-      display: 'flex',
-      flexDirection: 'column',
-      boxSizing: 'border-box',
-      borderRight: isMobile ? 'none' : '1px solid',
-      borderColor: 'divider'
-    }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, px: 1 }}>
-        <AppLogo size={32} />
-        {isMobile && (
-          <IconButton onClick={() => setIsSidebarOpen(false)} size="small" color="inherit">
-            <X size={20} />
-          </IconButton>
-        )}
-      </Box>
-
-      <List sx={{ flexGrow: 1, gap: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        <ListItem disablePadding>
-          <ListItemButton
-            onClick={() => navigate('/Home')}
-            sx={{ borderRadius: 2, color: 'text.secondary' }}
-          >
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><BookOpen size={20} /></ListItemIcon>
-            <ListItemText primary="Documents" />
-          </ListItemButton>
-        </ListItem>
-        <ListItem disablePadding>
-          <ListItemButton
-            onClick={() => navigate('/Favorites')}
-            sx={{ borderRadius: 2, color: 'text.secondary' }}
-          >
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><Star size={20} /></ListItemIcon>
-            <ListItemText primary="Favorites" />
-          </ListItemButton>
-        </ListItem>
-        <ListItem disablePadding>
-          <ListItemButton selected sx={{
-            borderRadius: 2,
-            bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.25)' : '#eff6ff',
-            color: mode === 'dark' ? '#60a5fa' : '#1d4ed8',
-            '&.Mui-selected': {
-              bgcolor: mode === 'dark' ? 'rgba(37, 99, 235, 0.35)' : '#eff6ff',
-            }
-          }}>
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><FolderIcon size={20} /></ListItemIcon>
-            <ListItemText primary="Folders" />
-          </ListItemButton>
-        </ListItem>
-      </List>
-
-      <Box sx={{ pt: 2, pb: 1 }}>
-        <Button
-          variant="contained"
-          fullWidth
-          startIcon={<Plus size={18} />}
-          onClick={() => {
-            setNewDialogOpen(true);
-            if (isMobile) setIsSidebarOpen(false);
-          }}
-          sx={{ py: 1.2, borderRadius: 2, textTransform: 'none', fontWeight: 600, boxShadow: 'none' }}
-        >
-          New Folder
-        </Button>
-      </Box>
-    </Box>
+    <AppSidebar
+      isMobile={isMobile}
+      onClose={() => setIsSidebarOpen(false)}
+      newButtonLabel="New Folder"
+      onNewClick={() => {
+        setNewDialogOpen(true);
+        if (isMobile) setIsSidebarOpen(false);
+      }}
+    />
   );
 
   return (

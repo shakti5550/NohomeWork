@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
-  Typography, Button, IconButton, Menu as MuiMenu, MenuItem, Dialog, DialogTitle,
+  Box, Drawer, Typography, Button, IconButton, List, ListItemButton, ListItemIcon, ListItemText,
+  Menu as MuiMenu, MenuItem, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Card, Alert, useMediaQuery, useTheme,
   Skeleton, CircularProgress
 } from '@mui/material';
 import {
-  BookOpen, Plus, Trash2, Folder as FolderIcon, Search, X, Download, ArrowLeft, Star
+  Trash2, Folder as FolderIcon, X, Download, ArrowLeft, Plus, Star, Search
 } from 'lucide-react';
 import {
   Notebook,
@@ -19,12 +19,12 @@ import {
   getFolder,
   setFavourite,
 } from '../storage/cloud';
-import { AppLogo } from './AppLogo';
 import { NotebookTile } from './NotebookTile';
 import { useThemeMode } from '../ThemeContext';
 import { ProfileDropdown } from './Auth/ProfileDropdown';
 import { useNavigate } from 'react-router-dom';
 import { Toast } from './Toast';
+import { AppSidebar } from './AppSidebar';
 
 interface FolderDetailProps {
   folderId: string;
@@ -32,6 +32,8 @@ interface FolderDetailProps {
 }
 
 export const FolderDetail: React.FC<FolderDetailProps> = ({ folderId, onSignOut }) => {
+  // Back from a notebook opened here should land on this folder, not /Home.
+  const returnTo = `/Folders/${folderId}`;
   const theme = useTheme();
   const { mode, toggleTheme } = useThemeMode();
   const navigate = useNavigate();
@@ -204,69 +206,15 @@ export const FolderDetail: React.FC<FolderDetailProps> = ({ folderId, onSignOut 
 
   // ─── Sidebar ──────────────────────────────────────────────────────────────
   const SidebarContent = (
-    <Box sx={{
-      width: 260,
-      bgcolor: 'background.paper',
-      color: 'text.primary',
-      height: isMobile ? '100%' : '100vh',
-      p: 2,
-      display: 'flex',
-      flexDirection: 'column',
-      boxSizing: 'border-box',
-      borderRight: isMobile ? 'none' : '1px solid',
-      borderColor: 'divider',
-    }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, px: 1 }}>
-        <AppLogo size={32} />
-        {isMobile && (
-          <IconButton onClick={() => setIsSidebarOpen(false)} size="small" color="inherit">
-            <X size={20} />
-          </IconButton>
-        )}
-      </Box>
-
-      <List sx={{ flexGrow: 1, gap: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        <ListItem disablePadding>
-          <ListItemButton
-            onClick={() => navigate('/Home')}
-            sx={{ borderRadius: 2, color: 'text.secondary' }}
-          >
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><BookOpen size={20} /></ListItemIcon>
-            <ListItemText primary="Documents" />
-          </ListItemButton>
-        </ListItem>
-        <ListItem disablePadding>
-          <ListItemButton sx={{ borderRadius: 2, color: 'text.secondary' }}>
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><Search size={20} /></ListItemIcon>
-            <ListItemText primary="Favorites" />
-          </ListItemButton>
-        </ListItem>
-        <ListItem disablePadding>
-          <ListItemButton
-            onClick={() => navigate('/Folders')}
-            sx={{ borderRadius: 2, color: 'text.secondary' }}
-          >
-            <ListItemIcon sx={{ minWidth: 36, color: 'inherit' }}><FolderIcon size={20} /></ListItemIcon>
-            <ListItemText primary="Folders" />
-          </ListItemButton>
-        </ListItem>
-      </List>
-
-      <Box sx={{ pt: 2, pb: 1 }}>
-        <Button
-          variant="contained"
-          fullWidth
-          startIcon={<Plus size={18} />}
-          onClick={() => {
-            setNewFolderDialogOpen(true);
-            if (isMobile) setIsSidebarOpen(false);
-          }}
-          sx={{ py: 1.2, borderRadius: 2, textTransform: 'none', fontWeight: 600, boxShadow: 'none' }}
-        >
-          New Folder
-        </Button>
-      </Box>
-    </Box>
+    <AppSidebar
+      isMobile={isMobile}
+      onClose={() => setIsSidebarOpen(false)}
+      newButtonLabel="New Folder"
+      onNewClick={() => {
+        setNewFolderDialogOpen(true);
+        if (isMobile) setIsSidebarOpen(false);
+      }}
+    />
   );
 
   return (
@@ -363,7 +311,7 @@ export const FolderDetail: React.FC<FolderDetailProps> = ({ folderId, onSignOut 
               <NotebookTile
                 key={nb.id}
                 nb={nb}
-                onOpen={(id) => navigate('/Editor/' + id)}
+                onOpen={(id) => navigate(`/Editor/${id}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`)}
                 onMenuOpen={handleMenuOpen}
                 menuActiveId={menuNotebookId}
               />

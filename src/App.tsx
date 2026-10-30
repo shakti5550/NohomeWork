@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   BrowserRouter as Router, Routes, Route, Navigate, useNavigate,
-  useParams
+  useParams, useSearchParams
 } from 'react-router-dom';
 import { LibraryView } from './components/LibraryView';
 import { FoldersView } from './components/FoldersView';
 import { FolderDetail } from './components/FolderDetail';
+import { BookmarksView } from './components/BookmarksView';
 import { EditorView } from './components/Editor/EditorView';
 import { Notebook, getNotebook } from './storage/cloud';
 import { AuthPage } from './components/Auth/AuthPage';
@@ -22,6 +23,7 @@ const FolderDetailRoute: React.FC<{ onSignOut: () => void }> = ({ onSignOut }) =
 const EditorRoute: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [notebook, setNotebook] = useState<Notebook | null>(null);
 
   useEffect(() => {
@@ -31,6 +33,17 @@ const EditorRoute: React.FC = () => {
       setNotebook(null);
     }
   }, [id]);
+
+  // A bookmark link may carry ?page=N (1-based). Resolve it to a 0-based
+  // index once the notebook is loaded so the editor opens on that page.
+  const requestedPage = (() => {
+    const raw = searchParams.get('page');
+    if (!raw) return undefined;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n - 1 : undefined;
+  })();
+  // Where the editor's Back button should send us. Absent = fall back to /Home.
+  const returnTo = searchParams.get('returnTo') ?? undefined;
 
   if (!id || !notebook) {
     return (
@@ -47,8 +60,11 @@ const EditorRoute: React.FC = () => {
   return (
     <EditorView
       notebook={notebook}
-      onBack={() => navigate('/Home', { replace: true })}
+      onBack={(returnTo) => navigate(returnTo || '/Home', { replace: true })}
       onUpdateNotebook={(updated) => setNotebook(updated)}
+      initialPage={requestedPage}
+      returnTo={returnTo}
+      initialPage={requestedPage}
     />
   );
 };
@@ -70,12 +86,23 @@ const AppContent: React.FC = () => {
       <Route path="/auth" element={<AuthPage onSuccess={handleSignInSuccess} />} />
       <Route path="/Home" element={
         <AuthGuard>
-          <LibraryView onOpenNotebook={(id) => navigate('/Editor/' + id)} onSignOut={handleSignOut} />
+          <LibraryView onOpenNotebook={(id, returnTo) => {
+              const q = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '';
+              navigate(`/Editor/${id}${q}`);
+            }} onSignOut={handleSignOut} />
         </AuthGuard>
       } />
       <Route path="/Favorites" element={
         <AuthGuard>
-          <LibraryView onOpenNotebook={(id) => navigate('/Editor/' + id)} onSignOut={handleSignOut} />
+          <LibraryView onOpenNotebook={(id, returnTo) => {
+              const q = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '';
+              navigate(`/Editor/${id}${q}`);
+            }} onSignOut={handleSignOut} returnTo="/Favorites" />
+        </AuthGuard>
+      } />
+      <Route path="/Bookmarks" element={
+        <AuthGuard>
+          <BookmarksView onSignOut={handleSignOut} />
         </AuthGuard>
       } />
       <Route path="/Folders" element={

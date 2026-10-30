@@ -225,7 +225,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut, mod
 
           {/* Theme Toggle - inside the profile box */}
           {toggleTheme && (
-            <>
+            <Box>
               <MenuItem
                 onClick={() => { toggleTheme(); handleMenuClose(); }}
                 sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5, borderRadius: 1.5, '&:hover': { bgcolor: 'action.hover' } }}
@@ -237,7 +237,7 @@ export const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onSignOut, mod
               </MenuItem>
 
               <Divider sx={{ my: 0.5 }} />
-            </>
+            </Box>
           )}
 
           {/* Menu Items */}

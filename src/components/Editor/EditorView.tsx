@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import {
   ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight,
-  Bot, X, Send, Pencil, Hand, LayoutGrid
+  Bot, X, Send, Pencil, Hand, LayoutGrid, Bookmark
 } from 'lucide-react';
 import { Notebook, Page, Stroke, TextAnnotation, saveNotebook, ChatMessage } from '../../storage/cloud';
 import { ChatButton } from '../AIChat/ChatButton';
@@ -15,8 +15,12 @@ import { useThemeMode } from '../../ThemeContext';
 
 interface EditorViewProps {
   notebook: Notebook;
-  onBack: () => void;
+  onBack: (returnTo?: string) => void;
   onUpdateNotebook: (updated: Notebook) => void;
+  /** Page index (0-based) to open on first render — e.g. from a bookmark link. */
+  initialPage?: number;
+  /** Route the editor should return to on Back; falls back to /Home. */
+  returnTo?: string;
 }
 
 type Tool = 'pen' | 'highlighter' | 'eraser';
@@ -25,12 +29,16 @@ type Template = 'blank' | 'ruled' | 'grid' | 'dotted';
 // Predefined colors for the palette
 const PRESET_COLORS = ['#000000', '#dc2626', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
 
-export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpdateNotebook }) => {
+export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpdateNotebook, initialPage, returnTo }) => {
   const { mode } = useThemeMode();
   const isLandscape = useMediaQuery('(orientation: landscape)');
 
   // Drawing state
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  // Open on the page a bookmark link pointed at (1-based in the URL), falling
+  // back to page 1 when the prop is absent or out of range.
+  const [currentPageIndex, setCurrentPageIndex] = useState(
+    (initialPage && initialPage >= 0 && initialPage < notebook.pages.length) ? initialPage : 0
+  );
   const [tool, setTool] = useState<Tool>('pen');
   const [color, setColor] = useState('#000000');
   const [width, setWidth] = useState(3);
@@ -72,6 +80,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   const isDrawingRef = useRef(false);
   const currentStrokeRef = useRef<Stroke | null>(null);
   const activePointerIdRef = useRef<number | null>(null);
+  // Set on double-click so the following single click doesn't also jump
+  // to the page. Cleared on the next render.
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasAreaRef = useRef<HTMLDivElement | null>(null);
   const panStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -283,7 +293,8 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       id: 'pg_' + Math.random().toString(36).substring(2, 9),
       pageNumber: notebook.pages.length + 1,
       template,
-      strokes: []
+      strokes: [],
+      bookmarked: false
     };
     const updatedPages = [...notebook.pages, newPage];
     updateCurrentNotebook(updatedPages, 0);
@@ -306,6 +317,17 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     updatedPages[currentPageIndex] = { ...currentPage, template: t };
     updateCurrentNotebook(updatedPages, 0);
     setTemplate(t);
+  };
+
+  // Toggle the bookmark flag on a page from the Pages dialog. Double-click
+  // a thumbnail to bookmark/unbookmark it. The change is persisted through
+  // the same debounced save path used for every other page edit.
+  const handleToggleBookmark = (index: number) => {
+    const page = notebook.pages[index];
+    if (!page) return;
+    const updatedPages = [...notebook.pages];
+    updatedPages[index] = { ...page, bookmarked: !page.bookmarked };
+    updateCurrentNotebook(updatedPages, 0);
   };
 
   // ─── Canvas drawing ───────────────────────────────────────────────────────
@@ -913,8 +935,10 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     } catch (err) {
       console.error('[Editor] Save failed:', err);
     }
-    onBack();
-  }, [onBack]);
+    // Send the user back to the screen they opened this notebook from
+    // (Bookmarks, Favorites, a Folder, or Documents) instead of always /Home.
+    onBack(returnTo);
+  }, [onBack, returnTo]);
 
   // The floating controls, in vertical order. On short viewports the
   // stack collapses into a horizontal bottom row so nothing is clipped off.
@@ -1677,6 +1701,27 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
                   >
                     {idx + 1}
                   </Typography>
+                  {/* Bookmark toggle button — top-right corner. */}
+                  <IconButton
+                    size="small"
+                    sx={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      bgcolor: 'rgba(255,255,255,0.85)',
+                      color: page.bookmarked ? '#2563eb' : 'grey.500',
+                      border: '1px solid',
+                      borderColor: page.bookmarked ? '#2563eb' : 'divider',
+                      '&:hover': { bgcolor: '#fff', color: '#1d4ed8' },
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleBookmark(idx);
+                    }}
+                    aria-label={page.bookmarked ? 'Remove bookmark' : 'Add bookmark'}
+                  >
+                    <Bookmark size={12} fill={page.bookmarked ? 'currentColor' : 'none'} />
+                  </IconButton>
                 </Box>
               );
             })}

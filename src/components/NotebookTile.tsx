@@ -11,10 +11,12 @@ import { Notebook } from '../storage/cloud';
  */
 interface NotebookTileProps {
   nb: Notebook;
-  onOpen: (id: string) => void;
+  onOpen: (id: string, returnTo?: string) => void;
   onMenuOpen: (e: React.MouseEvent<HTMLElement>, id: string) => void;
   /** The notebook id currently having its menu open, for aria-expanded. */
   menuActiveId: string | null;
+  /** Route to return to when the editor's Back button is pressed. */
+  returnTo?: string;
 }
 
 export const NotebookTile: React.FC<NotebookTileProps> = ({
@@ -22,6 +24,7 @@ export const NotebookTile: React.FC<NotebookTileProps> = ({
   onOpen,
   onMenuOpen,
   menuActiveId,
+  returnTo,
 }) => {
   return (
     <Card
@@ -38,7 +41,7 @@ export const NotebookTile: React.FC<NotebookTileProps> = ({
         color: '#fff',
         position: 'relative',
       }}
-      onClick={() => onOpen(nb.id)}
+      onClick={() => onOpen(nb.id, returnTo)}
     >
       <Box sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <Box>

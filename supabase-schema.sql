@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS pages (
   template text DEFAULT 'ruled',
   strokes jsonb DEFAULT '[]'::jsonb,
   text_annotations jsonb DEFAULT '[]'::jsonb,
+  bookmarked boolean NOT NULL DEFAULT false,
   updated_at bigint NOT NULL,
   version bigint NOT NULL DEFAULT 1,
 );

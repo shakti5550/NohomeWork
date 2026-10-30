@@ -39,6 +39,21 @@ export interface Page {
   strokes: Stroke[];
   textAnnotations?: TextAnnotation[];
   backgroundPdfUrl?: string;
+  bookmarked: boolean;
+}
+
+/**
+ * A bookmarked page, returned grouped by notebook so the Bookmarks screen
+ * can render one collapsible section per notebook with page shortcuts
+ * underneath — mirroring how the Documents screen groups notebooks by date.
+ */
+export interface BookmarkEntry {
+  pageId: string;
+  notebookId: string;
+  notebookTitle: string;
+  notebookCoverColor: string;
+  pageNumber: number;
+  template: Page['template'];
 }
 
 export interface Notebook {
@@ -164,6 +179,7 @@ export async function getAllNotebooks(): Promise<Notebook[]> {
       strokes: p.strokes ?? [],
       textAnnotations: p.text_annotations ?? [],
       backgroundPdfUrl: p.background_pdf_url,
+      bookmarked: p.bookmarked ?? false,
     })),
   }));
 }
@@ -206,8 +222,65 @@ export async function getNotebook(id: string): Promise<Notebook | undefined> {
       strokes: p.strokes ?? [],
       textAnnotations: p.text_annotations ?? [],
       backgroundPdfUrl: p.background_pdf_url,
+      bookmarked: p.bookmarked ?? false,
     })),
   };
+}
+
+// ─── Bookmarks ─────────────────────────────────────────────────────────────
+
+/**
+ * Returns every bookmarked page across the signed-in user's notebooks,
+ * grouped by notebook so the Bookmarks screen can render one collapsible
+ * section per notebook with page shortcuts underneath.
+ */
+export async function getBookmarkedPages(): Promise<BookmarkEntry[]> {
+  ensureSignedIn();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data: nbRows, error: nbErr } = await supabase
+    .from('notebooks')
+    .select('id, title, cover_color')
+    .eq('user_id', user.id);
+  if (nbErr) throw nbErr;
+  if (!nbRows || nbRows.length === 0) return [];
+
+  const ids = nbRows.map((r) => r.id);
+  const pagesByNotebook = await fetchAllPages(ids);
+
+  const nbById = new Map(nbRows.map((r) => [r.id, r]));
+  const entries: BookmarkEntry[] = [];
+  for (const nb of nbRows) {
+    const pages = pagesByNotebook.get(nb.id) ?? [];
+    for (const p of pages) {
+      if (p.bookmarked) {
+        entries.push({
+          pageId: p.id,
+          notebookId: nb.id,
+          notebookTitle: nb.title,
+          notebookCoverColor: nb.cover_color,
+          pageNumber: p.page_number,
+          template: p.template as Page['template'],
+        });
+      }
+    }
+  }
+  return entries;
+}
+
+/**
+ * Toggles the bookmark flag on a single page without reloading the whole
+ * notebook. Used by the Bookmarks screen so unbookmarking a page is a
+ * cheap targeted UPDATE rather than a full notebook fetch + save.
+ */
+export async function setPageBookmarked(pageId: string, bookmarked: boolean): Promise<void> {
+  ensureSignedIn();
+  const { error } = await supabase
+    .from('pages')
+    .update({ bookmarked, updated_at: Date.now() })
+    .eq('id', pageId);
+  if (error) throw error;
 }
 
 // ─── Write ───────────────────────────────────────────────────────────────
@@ -271,6 +344,7 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
     template: page.template,
     strokes: page.strokes,
     text_annotations: page.textAnnotations ?? [],
+    bookmarked: page.bookmarked ?? false,
     updated_at: now,
   }));
   if (rows.length > 0) {
@@ -337,6 +411,7 @@ export async function createDefaultNotebook(title: string = 'Untitled Notebook')
         template: 'ruled',
         strokes: [],
         textAnnotations: [],
+        bookmarked: false,
       },
     ],
   };
@@ -514,6 +589,7 @@ async function getNotebooksByIds(ids: string[]): Promise<Notebook[]> {
       strokes: p.strokes ?? [],
       textAnnotations: p.text_annotations ?? [],
       backgroundPdfUrl: p.background_pdf_url,
+      bookmarked: p.bookmarked ?? false,
     })),
   }));
 }
