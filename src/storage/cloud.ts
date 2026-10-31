@@ -68,6 +68,8 @@ export interface Notebook {
   version?: number;
   aiChat?: ChatMessage[];
   favourite: boolean;
+  /** Epoch ms when this notebook was moved to Trash; null = active. */
+  deletedAt?: number | null;
 }
 
 export interface ChatMessage {
@@ -151,6 +153,7 @@ export async function getAllNotebooks(): Promise<Notebook[]> {
     .from('notebooks')
     .select('*')
     .eq('user_id', user.id)
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false });
 
   if (nbErr) throw nbErr;
@@ -172,6 +175,7 @@ export async function getAllNotebooks(): Promise<Notebook[]> {
     version: row.version,
     aiChat: row.ai_chat ?? [],
     favourite: row.is_favorite ?? false,
+    deletedAt: row.deleted_at ?? null,
     pages: (pagesByNotebook.get(row.id) ?? []).map((p) => ({
       id: p.id,
       pageNumber: p.page_number,
@@ -195,6 +199,7 @@ export async function getNotebook(id: string): Promise<Notebook | undefined> {
     .from('notebooks')
     .select('*')
     .eq('id', id)
+    .is('deleted_at', null)
     .maybeSingle();
 
   if (nbErr) throw nbErr;
@@ -215,6 +220,7 @@ export async function getNotebook(id: string): Promise<Notebook | undefined> {
     version: row.version,
     aiChat: row.ai_chat ?? [],
     favourite: row.is_favorite ?? false,
+    deletedAt: row.deleted_at ?? null,
     pages: pageRows.map((p) => ({
       id: p.id,
       pageNumber: p.page_number,
@@ -368,9 +374,166 @@ export async function saveNotebook(notebook: Notebook): Promise<void> {
 
 export async function deleteNotebook(id: string): Promise<void> {
   ensureSignedIn();
-  // Pages are deleted automatically via ON DELETE CASCADE in the schema
-  const { error } = await supabase.from('notebooks').delete().eq('id', id);
+  // Soft-delete: the notebook (and its pages via ON DELETE CASCADE) is moved
+  // to Trash and purged after 15 days instead of being hard-deleted right away.
+  const { error } = await supabase
+    .from('notebooks')
+    .update({ deleted_at: Date.now(), updated_at: Date.now() })
+    .eq('id', id);
   if (error) throw error;
+}
+
+/**
+ * Restores a soft-deleted notebook (clears its deleted_at). Restoring a folder
+ * does not restore its notebooks — those must be restored separately.
+ */
+export async function restoreNotebook(id: string): Promise<void> {
+  ensureSignedIn();
+  const { error } = await supabase
+    .from('notebooks')
+    .update({ deleted_at: null, updated_at: Date.now() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+/**
+ * Restores a soft-deleted folder.
+ */
+export async function restoreFolder(id: string): Promise<void> {
+  ensureSignedIn();
+  const { error } = await supabase
+    .from('folders')
+    .update({ deleted_at: null, updated_at: Date.now() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+/**
+ * Hard-deletes a soft-deleted notebook and its pages immediately (bypasses
+ * the 15-day retention). Pages are removed via ON DELETE CASCADE.
+ */
+export async function hardDeleteNotebook(id: string): Promise<void> {
+  ensureSignedIn();
+  // Guard against stale views: only delete rows still in Trash. RLS policies
+  // only check user_id, so a concurrent restore would leave the row active
+  // and unprotected without this additional filter.
+  const { error } = await supabase
+    .from('notebooks')
+    .delete()
+    .eq('id', id)
+    .not('deleted_at', 'is', null);
+  if (error) throw error;
+}
+
+/**
+ * Hard-deletes a soft-deleted folder immediately (bypasses the 15-day
+ * retention). notebook_folders links are removed via ON DELETE CASCADE.
+ */
+export async function hardDeleteFolder(id: string): Promise<void> {
+  ensureSignedIn();
+  const { error } = await supabase
+    .from('folders')
+    .delete()
+    .eq('id', id)
+    .not('deleted_at', 'is', null);
+  if (error) throw error;
+}
+
+/**
+ * Hard-deletes everything whose deleted_at is older than `daysSinceDelete`.
+ * Called lazily when the Trash screen opens so expired items are removed
+ * without a background job.
+ */
+export async function purgeTrash(daysSinceDelete = 15): Promise<void> {
+  ensureSignedIn();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  const cutoff = Date.now() - daysSinceDelete * 24 * 60 * 60 * 1000;
+
+  // Hard-delete expired notebooks (their pages go via ON DELETE CASCADE).
+  const { error: nErr } = await supabase
+    .from('notebooks')
+    .delete()
+    .eq('user_id', user.id)
+    .not('deleted_at', 'is', null)
+    .lt('deleted_at', cutoff);
+  if (nErr) throw nErr;
+
+  // Hard-delete expired folders (their notebook_folders links go via CASCADE;
+  // notebooks already deleted by a folder delete are gone from the table).
+  const { error: fErr } = await supabase
+    .from('folders')
+    .delete()
+    .eq('user_id', user.id)
+    .not('deleted_at', 'is', null)
+    .lt('deleted_at', cutoff);
+  if (fErr) throw fErr;
+}
+
+/**
+ * Returns every soft-deleted notebook of the signed-in user, newest first.
+ */
+export async function getTrashNotebooks(): Promise<Notebook[]> {
+  ensureSignedIn();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data: nbRows, error: nbErr } = await supabase
+    .from('notebooks')
+    .select('*')
+    .eq('user_id', user.id)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false });
+  if (nbErr) throw nbErr;
+  if (!nbRows || nbRows.length === 0) return [];
+
+  const ids = nbRows.map((r) => r.id);
+  const pagesByNotebook = await fetchAllPages(ids);
+  return nbRows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    created_date: row.created_date,
+    coverColor: row.cover_color,
+    coverStyle: row.cover_style as Notebook['coverStyle'],
+    version: row.version,
+    aiChat: row.ai_chat ?? [],
+    favourite: row.is_favorite ?? false,
+    deletedAt: row.deleted_at ?? null,
+    pages: (pagesByNotebook.get(row.id) ?? []).map((p) => ({
+      id: p.id,
+      pageNumber: p.page_number,
+      template: p.template as Page['template'],
+      strokes: p.strokes ?? [],
+      textAnnotations: p.text_annotations ?? [],
+      backgroundPdfUrl: p.background_pdf_url,
+      bookmarked: p.bookmarked ?? false,
+    })),
+  }));
+}
+
+/**
+ * Returns every soft-deleted folder of the signed-in user, newest first.
+ */
+export async function getTrashFolders(): Promise<Folder[]> {
+  ensureSignedIn();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data: rows, error } = await supabase
+    .from('folders')
+    .select('*')
+    .eq('user_id', user.id)
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false });
+  if (error) throw error;
+  return (rows ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    created_date: r.created_date,
+    deletedAt: r.deleted_at ?? null,
+  }));
 }
 
 /**
@@ -428,6 +591,8 @@ export interface Folder {
   createdAt: number;
   updatedAt: number;
   created_date?: string;
+  /** Epoch ms when this folder was moved to Trash; null = active. */
+  deletedAt?: number | null;
 }
 
 export async function createFolder(name: string): Promise<Folder> {
@@ -465,6 +630,7 @@ export async function getFolders(): Promise<Folder[]> {
     .from('folders')
     .select('*')
     .eq('user_id', user.id)
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false });
   if (error) throw error;
   return (rows ?? []).map((r) => ({
@@ -473,13 +639,18 @@ export async function getFolders(): Promise<Folder[]> {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     created_date: r.created_date,
+    deletedAt: r.deleted_at ?? null,
   }));
 }
 
 export async function deleteFolder(id: string): Promise<void> {
   ensureSignedIn();
-  // notebook_folders rows are deleted via ON DELETE CASCADE
-  const { error } = await supabase.from('folders').delete().eq('id', id);
+  // Soft-delete: the folder is moved to Trash and purged after 15 days.
+  // notebook_folders rows are kept so the folder can be restored.
+  const { error } = await supabase
+    .from('folders')
+    .update({ deleted_at: Date.now(), updated_at: Date.now() })
+    .eq('id', id);
   if (error) throw error;
 }
 
@@ -567,7 +738,8 @@ async function getNotebooksByIds(ids: string[]): Promise<Notebook[]> {
   const { data: nbRows, error: nbErr } = await supabase
     .from('notebooks')
     .select('*')
-    .in('id', ids);
+    .in('id', ids)
+    .is('deleted_at', null);
   if (nbErr) throw nbErr;
   if (!nbRows || nbRows.length === 0) return [];
   const pagesByNotebook = await fetchAllPages(nbRows.map((r) => r.id));
@@ -582,6 +754,7 @@ async function getNotebooksByIds(ids: string[]): Promise<Notebook[]> {
     version: row.version,
     aiChat: row.ai_chat ?? [],
     favourite: row.is_favorite ?? false,
+    deletedAt: row.deleted_at ?? null,
     pages: (pagesByNotebook.get(row.id) ?? []).map((p) => ({
       id: p.id,
       pageNumber: p.page_number,

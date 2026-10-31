@@ -65,7 +65,7 @@ export const FoldersView: React.FC<FoldersViewProps> = ({ onSignOut }) => {
       try {
         await deleteFolder(id);
         loadFolders();
-        setImportNotice({ message: 'Folder deleted.', severity: 'success' });
+        setImportNotice({ message: 'Folder moved to Trash.', severity: 'success' });
       } catch (err: any) {
         setImportNotice({ message: err.message || 'Failed to delete folder', severity: 'error' });
       }

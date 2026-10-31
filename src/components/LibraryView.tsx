@@ -162,8 +162,13 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this notebook?')) {
-      await deleteNotebook(id);
-      loadNotebooks();
+      try {
+        await deleteNotebook(id);
+        loadNotebooks();
+        setImportNotice('Notebook moved to Trash.');
+      } catch (err: any) {
+        setImportNotice(err.message || 'Failed to delete notebook');
+      }
     }
   };
 

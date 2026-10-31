@@ -4,7 +4,7 @@ import {
   Typography, Button, IconButton
 } from '@mui/material';
 import {
-  BookOpen, Star, Folder, Bookmark as BookmarkIcon, X, Plus
+  BookOpen, Star, Folder, Bookmark as BookmarkIcon, X, Plus, Trash2
 } from 'lucide-react';
 import { AppLogo } from './AppLogo';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -39,6 +39,8 @@ interface AppSidebarProps {
   onNewClick: () => void;
   /** Additional nav items injected below the standard set. */
   extraNavItems?: ExtraNavItem[];
+  /** Hide the bottom action button entirely (used by screens like Trash that have no "create" action). */
+  hideNewButton?: boolean;
 }
 
 export const AppSidebar: React.FC<AppSidebarProps> = ({
@@ -46,7 +48,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   onClose,
   newButtonLabel,
   onNewClick,
-  extraNavItems
+  extraNavItems,
+  hideNewButton
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -57,6 +60,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     { label: 'Favorites', icon: <Star size={20} />, to: '/Favorites', active: (p) => p === '/Favorites' },
     { label: 'Folders', icon: <Folder size={20} />, to: '/Folders', active: (p) => p.startsWith('/Folders') },
     { label: 'Bookmarks', icon: <BookmarkIcon size={20} />, to: '/Bookmarks', active: (p) => p === '/Bookmarks' },
+    { label: 'Trash', icon: <Trash2 size={20} />, to: '/Trash', active: (p) => p === '/Trash' },
   ];
 
   return (
@@ -121,17 +125,19 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         ))}
       </List>
 
-      <Box sx={{ pt: 2, pb: 1 }}>
-        <Button
-          variant="contained"
-          fullWidth
-          startIcon={<Plus size={18} />}
-          onClick={onNewClick}
-          sx={{ py: 1.2, borderRadius: 2, textTransform: 'none', fontWeight: 600, boxShadow: 'none' }}
-        >
-          {newButtonLabel}
-        </Button>
-      </Box>
+      {!hideNewButton && (
+        <Box sx={{ pt: 2, pb: 1 }}>
+          <Button
+            variant="contained"
+            fullWidth
+            startIcon={<Plus size={18} />}
+            onClick={onNewClick}
+            sx={{ py: 1.2, borderRadius: 2, textTransform: 'none', fontWeight: 600, boxShadow: 'none' }}
+          >
+            {newButtonLabel}
+          </Button>
+        </Box>
+      )}
     </Box>
   );
 };

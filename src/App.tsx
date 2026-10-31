@@ -7,6 +7,7 @@ import { LibraryView } from './components/LibraryView';
 import { FoldersView } from './components/FoldersView';
 import { FolderDetail } from './components/FolderDetail';
 import { BookmarksView } from './components/BookmarksView';
+import { TrashView } from './components/TrashView';
 import { EditorView } from './components/Editor/EditorView';
 import { Notebook, getNotebook } from './storage/cloud';
 import { AuthPage } from './components/Auth/AuthPage';
@@ -64,7 +65,6 @@ const EditorRoute: React.FC = () => {
       onUpdateNotebook={(updated) => setNotebook(updated)}
       initialPage={requestedPage}
       returnTo={returnTo}
-      initialPage={requestedPage}
     />
   );
 };
@@ -103,6 +103,11 @@ const AppContent: React.FC = () => {
       <Route path="/Bookmarks" element={
         <AuthGuard>
           <BookmarksView onSignOut={handleSignOut} />
+        </AuthGuard>
+      } />
+      <Route path="/Trash" element={
+        <AuthGuard>
+          <TrashView onSignOut={handleSignOut} />
         </AuthGuard>
       } />
       <Route path="/Folders" element={

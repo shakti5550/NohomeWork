@@ -14,6 +14,9 @@ CREATE TABLE IF NOT EXISTS notebooks (
   created_date text,
   version bigint NOT NULL DEFAULT 1,
   ai_chat jsonb DEFAULT '[]'::jsonb,
+  -- Soft-delete: null = active, a timestamp = moved to Trash.
+  -- Trash items are purged after 15 days (lazy cleanup on the Trash screen).
+  deleted_at bigint
 );
 
 -- 2. Pages table (stores page data with strokes as JSONB)
@@ -59,7 +62,9 @@ CREATE TABLE IF NOT EXISTS folders (
   name        text NOT NULL,
   created_at  bigint NOT NULL,
   updated_at  bigint NOT NULL,
-  created_date text
+  created_date text,
+  -- Soft-delete: null = active, a timestamp = moved to Trash.
+  deleted_at bigint
 );
 
 -- 7. Notebook ↔ folder link (a notebook may belong to many folders)
