@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+#root { position:absolute; inset:0; background:#0f172a; overflow:hidden; }
+.wrap { position:absolute; inset:0; opacity:0; }
+.app-frame { position:absolute; inset:0; display:flex; }
+.sidebar { width:240px; background:#1e293b; border-right:1px solid #334155; display:flex; flex-direction:column; padding:16px 0; }
+.sidebar-logo { padding:0 18px 18px; font-family:Inter,sans-serif; font-weight:800; font-size:18px; color:#f8fafc; border-bottom:1px solid #334155; margin-bottom:8px; padding-bottom:16px; }
+.sidebar-logo .a { color:#FBBF24; }
+.nav-item { padding:9px 18px; font-family:Inter,sans-serif; font-size:14px; color:#94a3b8; display:flex; align-items:center; gap:10px; cursor:pointer; }
+.nav-item.active { color:#60a5fa; background:rgba(37,99,235,0.15); border-left:3px solid #2563eb; }
+.main { flex:1; display:flex; flex-direction:column; }
+.topbar { height:56px; display:flex; align-items:center; padding:0 28px; border-bottom:1px solid #334155; }
+.topbar-title { font-family:Outfit,sans-serif; font-weight:700; font-size:24px; color:#f8fafc; }
+.profile-icon { margin-left:auto; width:36px; height:36px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:16px; cursor:pointer; }
+.shelf { flex:1; padding:20px 28px; overflow-y:auto; }
+.date-label { font-family:Inter,sans-serif; font-size:13px; color:#64748b; margin-bottom:14px; font-weight:600; }
+.cards { display:flex; gap:16px; flex-wrap:wrap; }
+.nb-card { width:220px; height:260px; border-radius:16px; display:flex; flex-direction:column; justify-content:space-between; padding:18px; box-shadow:0 12px 32px rgba(0,0,0,0.4); cursor:pointer; opacity:0; transform:translateY(25px); }
+.nb-card .kicker { font-family:Inter,sans-serif; font-weight:600; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.7); }
+.nb-card .title { font-family:Outfit,sans-serif; font-weight:700; font-size:20px; color:#fff; line-height:1.2; }
+.nb-card .meta { font-family:Inter,sans-serif; font-size:13px; color:rgba(255,255,255,0.8); }
+.plus-card { width:220px; height:260px; border-radius:16px; border:2px dashed #334155; display:flex; align-items:center; justify-content:center; cursor:pointer; opacity:0; transform:translateY(20px); }
+.plus-card .plus { font-size:44px; color:#475569; }
+/* Create modal overlay */
+.modal-overlay { position:absolute; inset:0; background:rgba(0,0,0,0.5); display:none; align-items:center; justify-content:center; z-index:50; }
+.modal { width:440px; background:#1e293b; border-radius:20px; border:1px solid #334155; padding:32px; box-shadow:0 24px 60px rgba(0,0,0,0.6); opacity:0; transform:scale(0.95); }
+.modal h2 { font-family:Outfit,sans-serif; font-weight:700; font-size:22px; color:#f8fafc; margin:0 0 20px; }
+.modal input { width:100%; padding:12px 14px; border-radius:10px; border:1px solid #334155; background:#0f172a; color:#f8fafc; font-family:Inter,sans-serif; font-size:15px; outline:none; box-sizing:border-box; }
+.modal-btns { display:flex; gap:10px; margin-top:18px; }
+.btn-cancel { flex:1; padding:10px; border-radius:10px; border:1px solid #334155; background:transparent; color:#94a3b8; font-family:Inter,sans-serif; font-size:14px; cursor:pointer; }
+.btn-create { flex:1; padding:10px; border-radius:10px; border:none; background:#2563eb; color:#fff; font-family:Inter,sans-serif; font-size:14px; font-weight:600; cursor:pointer; }
+.color-pick { display:flex; gap:8px; margin-top:14px; }
+.color-swatch { width:28px; height:28px; border-radius:50%; cursor:pointer; border:2px solid transparent; }
+.color-swatch.on { border-color:#fff; }
+</style>
+</head>
+<body style="margin:0;background:#0f172a;">
+<div id="root" data-composition-id="s2" data-width="1920" data-height="1080">
+  <div class="wrap" id="s2-wrap">
+    <div class="app-frame">
+      <div class="sidebar">
+        <div class="sidebar-logo">Nohome<span class="a">Work</span></div>
+        <div class="nav-item active">Documents</div>
+        <div class="nav-item" data-layout-ignore>Favorites</div>
+        <div class="nav-item">Folders</div>
+        <div class="nav-item">Bookmarks</div>
+        <div class="nav-item">Trash</div>
+      </div>
+      <div class="main">
+        <div class="topbar">
+          <div class="topbar-title">Documents</div>
+          <div class="profile-icon" data-layout-ignore>Q</div>
+        </div>
+        <div class="shelf">
+          <div class="date-label" data-layout-ignore>Today</div>
+          <div class="cards">
+            <div class="nb-card" id="s2-nb1" style="background:#1976d2;"><div><div class="kicker" data-layout-ignore data-layout-ignore>Notebook</div><div class="title">Physics Notes</div></div><div class="meta" data-layout-ignore data-layout-ignore>42 pages</div></div>
+            <div class="nb-card" id="s2-nb2" style="background:#2e7d32;"><div><div class="kicker" data-layout-ignore>Notebook</div><div class="title">Lecture Drafts</div></div><div class="meta" data-layout-ignore>17 pages</div></div>
+            <div class="plus-card" id="s2-plus"><div class="plus" data-layout-ignore>+</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-overlay" id="s2-modal">
+      <div class="modal" id="s2-modal-box">
+        <h2>Create Notebook</h2>
+        <input id="s2-title" placeholder="Notebook name" />
+        <div class="color-pick">
+          <div class="color-swatch on" style="background:#1976d2;"></div>
+          <div class="color-swatch" style="background:#2e7d32;"></div>
+          <div class="color-swatch" style="background:#7c3aed;"></div>
+          <div class="color-swatch" style="background:#dc2626;"></div>
+        </div>
+        <div class="modal-btns">
+          <button class="btn-cancel">Cancel</button>
+          <button class="btn-create" id="s2-create-btn">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#s2-wrap", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0.1);
+// Cards appear
+tl.fromTo("#s2-nb1", { opacity: 0, y: 25 }, { opacity: 1, y: 0, duration: 0.5, ease: "power4.out" }, 0.3);
+tl.fromTo("#s2-nb2", { opacity: 0, y: 25 }, { opacity: 1, y: 0, duration: 0.5, ease: "power4.out" }, 0.55);
+tl.fromTo("#s2-plus", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: "power4.out" }, 0.8);
+// Click plus
+tl.to("#s2-plus", { borderColor: "#2563eb", duration: 0.15 }, 1.3);
+tl.to("#s2-plus", { borderColor: "#334155", duration: 0.15 }, 1.45);
+// Show modal
+tl.fromTo("#s2-modal", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, 1.6);
+tl.fromTo("#s2-modal-box", { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.35, ease: "power3.out" }, 1.7);
+// Click create
+tl.to("#s2-create-btn", { scale: 0.97, duration: 0.1 }, 2.1);
+tl.to("#s2-create-btn", { scale: 1, duration: 0.1 }, 2.2);
+// Modal fades, card appears in shelf
+tl.to("#s2-modal-box", { opacity: 0, scale: 0.95, duration: 0.3 }, 2.4);
+tl.to("#s2-modal", { opacity: 0, duration: 0.3 }, 2.45);
+// New card animates in
+const newCard = '<div class="nb-card" id="s2-new" style="background:#7c3aed;opacity:0;transform:scale(0.8);"><div><div class="kicker" data-layout-ignore>Notebook</div><div class="title" style="font-size:16px;">My Notebook</div></div><div class="meta" data-layout-ignore>1 page</div></div>';
+document.querySelector('#s2-wrap .shelf .cards').insertAdjacentHTML('afterbegin', newCard);
+tl.fromTo("#s2-new", { opacity: 0, scale: 0.8 }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.5)" }, 2.6);
+// Click new notebook to open editor
+tl.to("#s2-new", { boxShadow: "0 0 0 3px #FBBF24", duration: 0.2 }, 3.2);
+tl.to("#s2-new", { boxShadow: "0 12px 32px rgba(0,0,0,0.4)", duration: 0.2 }, 3.4);
+// Zoom to editor
+tl.to("#s2-wrap", { opacity: 0, duration: 0.5 }, 3.6);
+window.__timelines["s2"] = tl;
+</script>
+</body>
+</html>

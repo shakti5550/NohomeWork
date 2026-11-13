@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+#root { position:absolute; inset:0; background:#0f172a; overflow:hidden; }
+.wrap { position:absolute; inset:0; opacity:0; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+.logo-svg { width:120px; height:120px; margin-bottom:24px; }
+.logo-svg rect { fill:#0f172a; stroke:#334155; stroke-width:2; rx:24; }
+.logo-svg .ln { stroke:#ffffff; stroke-width:8; stroke-linecap:round; stroke-opacity:0.95; }
+.logo-svg .pen { stroke:#FBBF24; stroke-width:20; stroke-linecap:round; stroke-linejoin:round; fill:none; }
+.brand { font-family:Outfit,sans-serif; font-weight:800; font-size:56px; letter-spacing:-2px; color:#f8fafc; opacity:0; }
+.brand .a { color:#FBBF24; }
+</style>
+</head>
+<body style="margin:0;background:#0f172a;">
+<div id="root" data-composition-id="s10" data-width="1920" data-height="1080">
+  <div class="wrap" id="s10-wrap">
+    <svg class="logo-svg" viewBox="0 0 128 128" preserveAspectRatio="xMidYMid meet">
+      <rect width="128" height="128" rx="24" />
+      <line class="ln" x1="32" y1="38" x2="74" y2="38" />
+      <line class="ln" x1="32" y1="54" x2="70" y2="54" />
+      <line class="ln" x1="32" y1="70" x2="58" y2="70" />
+      <path class="pen" d="M 36 98 L 58 50 L 88 40 L 70 94" />
+    </svg>
+    <div class="brand" id="s10-brand">Nohome<span class="a">Work</span></div>
+  </div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#s10-wrap", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 0);
+tl.fromTo("#s10-brand", { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.6, ease: "power4.out" }, 0.2);
+// Subtle glow pulse on logo
+tl.to(".logo-svg", { filter: "brightness(1.1)", duration: 0.8, ease: "sine.inOut", yoyo: true, repeat: 1 }, 0.8);
+window.__timelines["s10"] = tl;
+</script>
+</body>
+</html>

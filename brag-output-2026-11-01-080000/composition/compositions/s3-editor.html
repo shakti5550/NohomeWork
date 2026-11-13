@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@500&display=swap');
+#root { position:absolute; inset:0; background:#0f172a; overflow:hidden; }
+.wrap { position:absolute; inset:0; opacity:0; }
+.app-frame { position:absolute; inset:0; display:flex; }
+.sidebar { width:220px; background:#1e293b; border-right:1px solid #334155; display:flex; flex-direction:column; padding:14px 0; }
+.sidebar-logo { padding:0 16px 14px; font-family:Inter,sans-serif; font-weight:800; font-size:16px; color:#f8fafc; border-bottom:1px solid #334155; margin-bottom:6px; padding-bottom:14px; }
+.sidebar-logo .a { color:#FBBF24; }
+.nav-item { padding:8px 16px; font-family:Inter,sans-serif; font-size:13px; color:#94a3b8; }
+.editor-main { flex:1; display:flex; flex-direction:column; }
+.topbar { height:52px; display:flex; align-items:center; padding:0 16px; gap:12px; border-bottom:1px solid #334155; background:rgba(15,23,42,0.95); }
+.back-btn { font-family:Inter,sans-serif; font-size:13px; color:#94a3b8; background:none; border:1px solid #334155; padding:5px 12px; border-radius:8px; cursor:pointer; }
+.page-label { font-family:Inter,sans-serif; font-size:14px; font-weight:600; color:#f8fafc; }
+.toolbar-area { flex:1; display:flex; align-items:center; justify-content:center; padding:20px; position:relative; }
+.paper { width:900px; height:1100px; background:#ffffff; border-radius:4px; box-shadow:0 20px 60px rgba(0,0,0,0.5); position:relative; overflow:hidden; }
+.rline { position:absolute; left:50px; right:50px; height:1px; background:#e2e8f0; }
+.float-toolbar { position:absolute; left:20px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:8px; }
+.tool-btn { width:42px; height:42px; border-radius:10px; background:#1e293b; border:1px solid #334155; color:#94a3b8; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:18px; opacity:0; }
+.tool-btn.on { background:#2563eb; color:#fff; border-color:#2563eb; }
+.chat-btn { position:absolute; bottom:20px; right:20px; width:50px; height:50px; border-radius:50%; background:#1e293b; border:2px solid #334155; color:#60a5fa; font-size:22px; cursor:pointer; z-index:100; display:flex; align-items:center; justify-content:center; opacity:0; box-shadow:0 4px 16px rgba(0,0,0,0.4); }
+.page-nav { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); display:flex; gap:8px; }
+.page-dot { width:8px; height:8px; border-radius:50%; background:#334155; }
+.page-dot.active { background:#2563eb; }
+/* Each letter: inline-block, proper spacing */
+.letter { display:inline-block; font-family:'Caveat',cursive; font-weight:500; font-size:130px; color:#0f172a; opacity:0; transform:translateY(10px); }
+.highlight { position:absolute; height:28px; background:rgba(251,191,36,0.5); border-radius:2px; opacity:0; transform:scaleX(0); transform-origin:left; }
+</style>
+</head>
+<body style="margin:0;background:#0f172a;">
+<div id="root" data-composition-id="s3" data-width="1920" data-height="1080">
+  <div class="wrap" id="s3-wrap">
+    <div class="app-frame">
+      <div class="sidebar">
+        <div class="sidebar-logo">Nohome<span class="a">Work</span></div>
+        <div class="nav-item" data-layout-ignore>Documents</div>
+        <div class="nav-item" data-layout-ignore>Favorites</div>
+        <div class="nav-item" data-layout-ignore>Folders</div>
+        <div class="nav-item" data-layout-ignore>Bookmarks</div>
+        <div class="nav-item" data-layout-ignore>Trash</div>
+      </div>
+      <div class="editor-main">
+        <div class="topbar">
+          <button class="back-btn" data-layout-ignore>← Back</button>
+          <div class="page-label" data-layout-ignore>My Notebook — Page 1</div>
+        </div>
+        <div class="toolbar-area" id="s3-area">
+          <div class="paper" data-layout-allow-overflow id="s3-paper">
+            <div class="rline" style="top:70px"></div>
+            <div class="rline" style="top:110px"></div>
+            <div class="rline" style="top:150px"></div>
+            <div class="rline" style="top:190px"></div>
+            <div class="rline" style="top:230px"></div>
+            <div class="rline" style="top:270px"></div>
+            <div class="rline" style="top:310px"></div>
+            <div class="rline" style="top:350px"></div>
+            <div class="rline" style="top:390px"></div>
+            <div class="rline" style="top:430px"></div>
+            <div class="rline" style="top:470px"></div>
+            <div class="rline" style="top:510px"></div>
+            <div class="rline" style="top:550px"></div>
+            <div class="rline" style="top:590px"></div>
+            <div class="rline" style="top:630px"></div>
+            <!-- Six spaced letters -->
+            <span class="letter" id="h-S" data-layout-allow-overlap>S</span>
+            <span class="letter" id="h-h" data-layout-allow-overlap>h</span>
+            <span class="letter" id="h-a" data-layout-allow-overlap>a</span>
+            <span class="letter" id="h-k" data-layout-allow-overlap>k</span>
+            <span class="letter" id="h-t" data-layout-allow-overlap>t</span>
+            <span class="letter" id="h-i" data-layout-allow-overlap>i</span>
+            <!-- Highlight bar positioned absolutely below the text line -->
+            <div class="highlight" id="s3-hl" style="top:610px;left:140px;width:560px;"></div>
+          </div>
+          <div class="float-toolbar">
+            <div class="tool-btn on" data-layout-ignore>&#9998;</div>
+            <div class="tool-btn" id="s3-hl-tool" data-layout-ignore>&#11036;</div>
+            <div class="tool-btn" data-layout-ignore>&#9744;</div>
+          </div>
+          <div class="chat-btn" id="s3-chat-btn" data-layout-ignore>&#9733;</div>
+        </div>
+        <div class="page-nav">
+          <div class="page-dot active"></div>
+          <div class="page-dot"></div>
+          <div class="page-dot"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#s3-wrap", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0);
+tl.to("#s3-paper", { scale: 1.03, duration: 1.5, ease: "power1.inOut" }, 0.3);
+tl.fromTo(".tool-btn", { opacity: 0, x: -8 }, { opacity: 1, x: 0, duration: 0.3, ease: "power2.out", stagger: 0.1 }, 1);
+// Write S h a k t i one letter at a time
+tl.fromTo("#h-S", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.5)" }, 1.6);
+tl.fromTo("#h-h", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.5)" }, 2.3);
+tl.fromTo("#h-a", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.5)" }, 3.0);
+tl.fromTo("#h-k", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.5)" }, 3.7);
+tl.fromTo("#h-t", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.5)" }, 4.4);
+tl.fromTo("#h-i", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: "back.out(1.5)" }, 5.1);
+// Switch to highlighter
+tl.to("#s3-hl-tool", { scale: 1.1, duration: 0.1 }, 5.8);
+tl.to("#s3-hl-tool", { scale: 1, duration: 0.1 }, 5.9);
+// Highlighter sweeps in
+tl.fromTo("#s3-hl", { opacity: 0, scaleX: 0 }, { opacity: 0.85, scaleX: 1, duration: 0.8, ease: "power2.inOut" }, 6.1);
+// Hold
+tl.to("#s3-paper", { y: -2, duration: 0.5, ease: "sine.inOut", yoyo: true, repeat: 2 }, 7.2);
+window.__timelines["s3"] = tl;
+</script>
+</body>
+</html>

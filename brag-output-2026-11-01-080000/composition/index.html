@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en"
+  data-composition-variables='[
+    {"id":"color-ground","type":"color","label":"Background","default":"#0f172a"},
+    {"id":"color-ink","type":"color","label":"Text","default":"#f8fafc"},
+    {"id":"color-accent","type":"color","label":"Accent","default":"#2563eb"},
+    {"id":"color-amber","type":"color","label":"Highlight","default":"#FBBF24"},
+    {"id":"font-display","type":"string","label":"Display font","default":"Outfit"},
+    {"id":"font-body","type":"string","label":"Body font","default":"Inter"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <title>NohomeWork — Product Walkthrough</title>
+  </head>
+  <body style="margin:0;background:#0f172a;">
+    <div id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="45"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="s1" data-composition-id="s1" data-composition-src="compositions/s1-login.html" data-start="0" data-duration="3" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s2" data-composition-id="s2" data-composition-src="compositions/s2-documents.html" data-start="3" data-duration="5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s3" data-composition-id="s3" data-composition-src="compositions/s3-editor.html" data-start="8" data-duration="10" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s4" data-composition-id="s4" data-composition-src="compositions/s4-homie.html" data-start="18" data-duration="5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s5" data-composition-id="s5" data-composition-src="compositions/s5-favorites.html" data-start="23" data-duration="5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s6" data-composition-id="s6" data-composition-src="compositions/s6-folders.html" data-start="28" data-duration="5" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s7" data-composition-id="s7" data-composition-src="compositions/s7-bookmarks.html" data-start="33" data-duration="4" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s8" data-composition-id="s8" data-composition-src="compositions/s8-trash.html" data-start="37" data-duration="4" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s9" data-composition-id="s9" data-composition-src="compositions/s9-profile.html" data-start="41" data-duration="2" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+      <div id="s10" data-composition-id="s10" data-composition-src="compositions/s10-logo.html" data-start="43" data-duration="2" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080"></div>
+    </div>
+
+    <audio id="music" data-start="0" data-duration="45" data-track-index="2" data-volume="0.10" src="assets/music/happy-beats-business-moves-vol-11-by-ende-dot-app.mp3"></audio>
+
+    <audio id="sfx-signin" data-start="2.5" data-duration="0.1" data-track-index="3" data-volume="0.7" src="assets/sfx/interface/click_003.ogg"></audio>
+    <audio id="sfx-create" data-start="5.1" data-duration="0.1" data-track-index="3" data-volume="0.7" src="assets/sfx/interface/click_003.ogg"></audio>
+    <audio id="sfx-open" data-start="8.0" data-duration="0.3" data-track-index="3" data-volume="0.6" src="assets/sfx/impact/impactSoft_medium_001.ogg"></audio>
+    <audio id="sfx-drawer" data-start="18.8" data-duration="0.3" data-track-index="3" data-volume="0.7" src="assets/sfx/interface/click_003.ogg"></audio>
+    <audio id="sfx-fav" data-start="23.2" data-duration="0.06" data-track-index="3" data-volume="0.6" src="assets/sfx/ui/rollover2.ogg"></audio>
+    <audio id="sfx-folder" data-start="28.8" data-duration="0.1" data-track-index="3" data-volume="0.7" src="assets/sfx/interface/click_003.ogg"></audio>
+    <audio id="sfx-thumb" data-start="33.7" data-duration="0.06" data-track-index="3" data-volume="0.6" src="assets/sfx/ui/rollover2.ogg"></audio>
+    <audio id="sfx-trash" data-start="37.1" data-duration="0.06" data-track-index="3" data-volume="0.6" src="assets/sfx/ui/rollover2.ogg"></audio>
+    <audio id="sfx-profile" data-start="41.2" data-duration="0.1" data-track-index="3" data-volume="0.7" src="assets/sfx/interface/click_003.ogg"></audio>
+    <audio id="sfx-signout" data-start="41.9" data-duration="0.1" data-track-index="3" data-volume="0.7" src="assets/sfx/interface/click_003.ogg"></audio>
+    <audio id="sfx-logo" data-start="43.2" data-duration="0.5" data-track-index="3" data-volume="1" src="assets/sfx/impact/impactBell_heavy_000.ogg"></audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      tl.fromTo("#s2", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.inOut" }, 2.7);
+      tl.to("#s1", { opacity: 0, duration: 0.4, ease: "power2.inOut" }, 2.7);
+
+      tl.fromTo("#s3", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.inOut" }, 7.7);
+      tl.to("#s2", { opacity: 0, duration: 0.4, ease: "power2.inOut" }, 7.7);
+
+      tl.fromTo("#s4", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.inOut" }, 17.7);
+      tl.to("#s3", { opacity: 0, duration: 0.4, ease: "power2.inOut" }, 17.7);
+
+      tl.fromTo("#s5", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.inOut" }, 22.7);
+      tl.to("#s4", { opacity: 0, duration: 0.4, ease: "power2.inOut" }, 22.7);
+
+      tl.fromTo("#s6", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.inOut" }, 27.7);
+      tl.to("#s5", { opacity: 0, duration: 0.4, ease: "power2.inOut" }, 27.7);
+
+      tl.fromTo("#s7", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.inOut" }, 32.7);
+      tl.to("#s6", { opacity: 0, duration: 0.4, ease: "power2.inOut" }, 32.7);
+
+      tl.fromTo("#s8", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.inOut" }, 36.7);
+      tl.to("#s7", { opacity: 0, duration: 0.4, ease: "power2.inOut" }, 36.7);
+
+      tl.fromTo("#s9", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.inOut" }, 40.7);
+      tl.to("#s8", { opacity: 0, duration: 0.4, ease: "power2.inOut" }, 40.7);
+
+      tl.fromTo("#s10", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.inOut" }, 42.7);
+      tl.to("#s9", { opacity: 0, duration: 0.4, ease: "power2.inOut" }, 42.7);
+
+      // Fade to black at end
+      tl.to("#s10-wrap", { opacity: 0, duration: 0.5, ease: "power2.in" }, 44.5);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+#root { position:absolute; inset:0; background:#0f172a; overflow:hidden; }
+.wrap { position:absolute; inset:0; opacity:0; }
+.app-frame { position:absolute; inset:0; display:flex; }
+.sidebar { width:220px; background:#1e293b; border-right:1px solid #334155; display:flex; flex-direction:column; padding:14px 0; }
+.sidebar-logo { padding:0 16px 14px; font-family:Inter,sans-serif; font-weight:800; font-size:16px; color:#f8fafc; border-bottom:1px solid #334155; margin-bottom:6px; padding-bottom:14px; }
+.sidebar-logo .a { color:#FBBF24; }
+.nav-item { padding:8px 16px; font-family:Inter,sans-serif; font-size:13px; color:#94a3b8; }
+.nav-item.active { color:#60a5fa; background:rgba(37,99,235,0.15); border-left:3px solid #2563eb; }
+.main { flex:1; display:flex; flex-direction:column; }
+.topbar { height:52px; display:flex; align-items:center; padding:0 24px; border-bottom:1px solid #334155; }
+.topbar-title { font-family:Outfit,sans-serif; font-weight:700; font-size:22px; color:#f8fafc; }
+.list { flex:1; padding:18px 24px; overflow-y:auto; }
+.folder-row { display:flex; align-items:center; gap:12px; padding:16px 18px; background:#1e293b; border:1px solid #334155; border-radius:12px; margin-bottom:10px; opacity:0; transform:translateX(-18px); }
+.folder-icon { width:40px; height:40px; border-radius:10px; background:rgba(37,99,235,0.2); display:flex; align-items:center; justify-content:center; font-size:20px; }
+.folder-name { font-family:Inter,sans-serif; font-weight:600; font-size:16px; color:#f8fafc; flex:1; }
+.folder-count { font-family:Inter,sans-serif; font-size:12px; color:#94a3b8; background:#334155; padding:3px 10px; border-radius:8px; }
+.open-panel { position:absolute; inset:0; display:none; background:#0f172a; }
+.open-panel .topbar { height:52px; display:flex; align-items:center; padding:0 24px; border-bottom:1px solid #334155; background:#1e293b; }
+.open-panel .topbar-title { font-family:Outfit,sans-serif; font-weight:700; font-size:22px; color:#f8fafc; }
+.open-panel .notebooks { padding:18px 24px; overflow-y:auto; }
+.nb-row { display:flex; align-items:center; gap:12px; padding:14px 16px; background:#0f172a; border:1px solid #334155; border-radius:10px; margin-bottom:10px; opacity:0; transform:scale(0.95); }
+.nb-dot { width:36px; height:36px; border-radius:8px; }
+.nb-title { font-family:Inter,sans-serif; font-weight:600; font-size:15px; color:#f8fafc; }
+</style>
+</head>
+<body style="margin:0;background:#0f172a;">
+<div id="root" data-composition-id="s6" data-width="1920" data-height="1080">
+  <div class="wrap" id="s6-wrap">
+    <div class="app-frame">
+      <div class="sidebar">
+        <div class="sidebar-logo">Nohome<span class="a">Work</span></div>
+        <div class="nav-item" data-layout-ignore>Documents</div>
+        <div class="nav-item" data-layout-ignore>Favorites</div>
+        <div class="nav-item active">Folders</div>
+        <div class="nav-item" data-layout-ignore>Bookmarks</div>
+        <div class="nav-item" data-layout-ignore>Trash</div>
+      </div>
+      <div class="main">
+        <div class="topbar"><div class="topbar-title">Folders</div></div>
+        <div class="list" id="s6-list">
+          <div class="folder-row" id="s6-f1">
+            <div class="folder-icon">&#128193;</div>
+            <div class="folder-name">Science</div>
+            <div class="folder-count" data-layout-ignore>5 notebooks</div>
+          </div>
+          <div class="folder-row" id="s6-f2">
+            <div class="folder-icon">&#128193;</div>
+            <div class="folder-name">Mathematics</div>
+            <div class="folder-count" data-layout-ignore>3 notebooks</div>
+          </div>
+          <div class="folder-row" id="s6-f3">
+            <div class="folder-icon">&#128193;</div>
+            <div class="folder-name">Projects</div>
+            <div class="folder-count" data-layout-ignore>8 notebooks</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="open-panel" id="s6-panel">
+      <div class="topbar"><div class="topbar-title" data-layout-allow-overlap>Science</div></div>
+      <div class="notebooks">
+        <div class="nb-row" id="s6-nb1"><div class="nb-dot" style="background:#1976d2;"></div><div class="nb-title">Physics Notes</div></div>
+        <div class="nb-row" id="s6-nb2"><div class="nb-dot" style="background:#2e7d32;"></div><div class="nb-title">Chemistry Lab</div></div>
+        <div class="nb-row" id="s6-nb3"><div class="nb-dot" style="background:#7c3aed;"></div><div class="nb-title">Biology Drafts</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#s6-wrap", { opacity: 0 }, { opacity: 1, duration: 0.35, ease: "power2.out" }, 0);
+tl.fromTo("#s6-f1", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.35, ease: "power3.out" }, 0.15);
+tl.fromTo("#s6-f2", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.35, ease: "power3.out" }, 0.35);
+tl.fromTo("#s6-f3", { opacity: 0, x: -18 }, { opacity: 1, x: 0, duration: 0.35, ease: "power3.out" }, 0.55);
+// Click Science folder
+tl.to("#s6-f1", { backgroundColor: "#334155", boxShadow: "0 0 0 2px #2563eb", duration: 0.2, ease: "power2.inOut" }, 0.8);
+tl.to("#s6-f1", { backgroundColor: "#1e293b", boxShadow: "none", duration: 0.2, ease: "power2.inOut" }, 1);
+// Switch to panel
+tl.to("#s6-list", { opacity: 0, duration: 0.3 }, 1.2);
+// Show panel (insert into DOM)
+document.getElementById('s6-panel').style.display = 'block';
+tl.fromTo("#s6-panel", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 1.4);
+// Notebook rows appear
+tl.fromTo("#s6-nb1", { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.3, ease: "power3.out" }, 1.6);
+tl.fromTo("#s6-nb2", { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.3, ease: "power3.out" }, 1.8);
+tl.fromTo("#s6-nb3", { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.3, ease: "power3.out" }, 2);
+// Hold animation
+tl.to("#s6-nb1", { x: 3, duration: 0.5, ease: "sine.inOut", yoyo: true, repeat: 1 }, 2.4);
+window.__timelines["s6"] = tl;
+</script>
+</body>
+</html>
