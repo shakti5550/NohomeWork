@@ -510,7 +510,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
                 <IconButton
                   onClick={() => importInputRef.current?.click()}
                   title="Import notebook"
-                  sx={{ color: 'text.secondary' }}
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: '50%',
+                    color: 'text.secondary',
+                    '&:hover': { bgcolor: 'action.hover', borderColor: 'text.secondary' }
+                  }}
                 >
                   <Upload size={20} />
                 </IconButton>
@@ -556,11 +564,21 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
                 />
               </Box>
 
-              {/* Import - between search and profile on desktop / iPad horizontal */}
+              {/* Import - between search and profile on desktop / iPad horizontal.
+                  Circular, same size as the profile avatar so the two
+                  read as a matched pair in the header. */}
               <IconButton
                 onClick={() => importInputRef.current?.click()}
                 title="Import notebook"
-                sx={{ color: 'text.secondary' }}
+                sx={{
+                  width: 36,
+                  height: 36,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: '50%',
+                  color: 'text.secondary',
+                  '&:hover': { bgcolor: 'action.hover', borderColor: 'text.secondary' }
+                }}
               >
                 <Upload size={20} />
               </IconButton>
