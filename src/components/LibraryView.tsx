@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import {
   Trash2, Search, Menu as MenuIcon, Download, Plus, Star, Folder,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Upload
 } from 'lucide-react';
 import { Notebook, loadNotebooks as loadCloudNotebooks, createDefaultNotebook, deleteNotebook, saveNotebook, createFolder, getFolders, addNotebookToFolder, setFavourite } from '../storage/cloud';
 import { useThemeMode } from '../ThemeContext';
@@ -117,6 +117,8 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
   // is expanded; the rest start collapsed. Seeded once notebooks load.
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const seededRef = useRef(false);
+  // Hidden file input for importing a `.docs` notebook.
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const loadNotebooks = async () => {
     try {
@@ -207,7 +209,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${nb.title.replace(/[^a-z0-9_-]/gi, '_').toLowerCase() || 'notebook'}.nohomework.json`;
+      a.download = `${nb.title.replace(/[^a-z0-9_-]/gi, '_').toLowerCase() || 'notebook'}.docs`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -216,6 +218,56 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
     } catch (err: any) {
       setImportNotice(err.message || 'Export failed');
     }
+  };
+
+  // Import: restore a notebook previously exported as a `.docs` file.
+  // Reads the file, validates the shape, then saves a fresh notebook
+  // (new id + pages) so the original is never mutated.
+  const handleImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const raw = e.target?.result;
+        if (typeof raw !== 'string') throw new Error('Could not read the file.');
+        const data = JSON.parse(raw);
+        if (!data || typeof data !== 'object' || !Array.isArray(data.pages)) {
+          throw new Error('Invalid notebook file: missing pages.');
+        }
+        const baseTitle = typeof data.title === 'string' && data.title.trim()
+          ? data.title.trim()
+          : 'Untitled Notebook';
+        const newNotebook: Notebook = {
+          id: 'nb_' + Math.random().toString(36).substring(2, 9),
+          title: baseTitle,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          created_date: new Date().toISOString().slice(0, 10),
+          coverColor: typeof data.coverColor === 'string' ? data.coverColor : '#1976d2',
+          coverStyle: (data.coverStyle === 'minimal' || data.coverStyle === 'classic' || data.coverStyle === 'grid')
+            ? data.coverStyle
+            : 'classic',
+          favourite: false,
+          pages: data.pages.map((p: any, i: number) => ({
+            id: 'pg_' + Math.random().toString(36).substring(2, 9),
+            pageNumber: typeof p.pageNumber === 'number' ? p.pageNumber : i + 1,
+            template: (p.template === 'blank' || p.template === 'ruled' || p.template === 'dotted' || p.template === 'grid')
+              ? p.template
+              : 'ruled',
+            strokes: Array.isArray(p.strokes) ? p.strokes : [],
+            textAnnotations: Array.isArray(p.textAnnotations) ? p.textAnnotations : [],
+            backgroundPdfUrl: typeof p.backgroundPdfUrl === 'string' ? p.backgroundPdfUrl : undefined,
+            bookmarked: !!p.bookmarked,
+          })),
+          aiChat: Array.isArray(data.aiChat) ? data.aiChat : [],
+        };
+        await saveNotebook(newNotebook);
+        setImportNotice(`Imported "${newNotebook.title}".`);
+        loadNotebooks();
+      } catch (err: any) {
+        setImportNotice(err.message || 'Import failed');
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Toggle the favourite flag on the notebook whose ⋮ menu is open.
@@ -410,6 +462,19 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
         {importNotice && (
           <Toast message={importNotice} severity="info" onClose={() => setImportNotice(null)} />
         )}
+        {/* Hidden file input — triggered by the Import button */}
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".docs,.nohomework.json,application/json"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImport(file);
+            // Reset so the same file can be imported again
+            e.target.value = '';
+          }}
+        />
         <Box sx={{ mb: 4 }}>
           {/* Desktop: single row — title left, search bar middle, profile icon right.
               Mobile/tablet: two rows — title+profile on top, full-width search below. */}
@@ -434,11 +499,21 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
                 </IconButton>
               )}
               <Typography variant="h4" sx={{ fontWeight: 700, color: 'text.primary', fontSize: { xs: '24px', md: '34px' }, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pageHeading}</Typography>
-              {/* Profile icon: mobile-only, right-aligned with title */}
+              {/* Import + Profile: mobile/tablet, right-aligned with title.
+                  Import sits immediately left of the profile avatar. */}
               <Box sx={{
                 ml: 'auto',
-                display: { xs: 'flex', md: 'none' }
+                display: { xs: 'flex', md: 'none' },
+                alignItems: 'center',
+                gap: 0.5
               }}>
+                <IconButton
+                  onClick={() => importInputRef.current?.click()}
+                  title="Import notebook"
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <Upload size={20} />
+                </IconButton>
                 <ProfileDropdown onSignOut={onSignOut} mode={mode} toggleTheme={toggleTheme} />
               </Box>
             </Box>
@@ -480,6 +555,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({ onOpenNotebook, onSign
                   }}
                 />
               </Box>
+
+              {/* Import - between search and profile on desktop / iPad horizontal */}
+              <IconButton
+                onClick={() => importInputRef.current?.click()}
+                title="Import notebook"
+                sx={{ color: 'text.secondary' }}
+              >
+                <Upload size={20} />
+              </IconButton>
 
               {/* Profile icon - desktop only */}
               <ProfileDropdown onSignOut={onSignOut} mode={mode} toggleTheme={toggleTheme} />
