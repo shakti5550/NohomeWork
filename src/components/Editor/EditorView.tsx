@@ -7,7 +7,7 @@ import {
   ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight,
   Bot, X, Send, Hand, LayoutGrid, Bookmark
 } from 'lucide-react';
-import { Notebook, Page, Stroke, TextAnnotation, saveNotebook, ChatMessage } from '../../storage/cloud';
+import { Notebook, Page, Stroke, StrokePoint, TextAnnotation, saveNotebook, ChatMessage } from '../../storage/cloud';
 import { ChatButton } from '../AIChat/ChatButton';
 import { DictationButton } from '../AIChat/DictationButton';
 import { sendMessage } from '../../services/ai';
@@ -76,6 +76,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // and would leak the capture forever — leaking it can swallow the next
   // Pencil tap, which is why the "turn off" double-tap is unreliable.
   const eraserPointerIdRef = useRef<number | null>(null);
+  // Accumulates the eraser's drag path so a stroke can be marker-erased
+  // along its whole length instead of deleting whole strokes at a point.
+  const eraserStrokeRef = useRef<{ x: number; y: number }[] | null>(null);
   const paginationRef = useRef<HTMLDivElement | null>(null);
 
   // Track pointer position for dictation
@@ -594,6 +597,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       // so stopDrawing() would return early and leak the capture. Track
       // the id here so it gets released on pointer-up.
       eraserPointerIdRef.current = e.pointerId;
+      // Start a fresh eraser drag path so the marker eraser can erase
+      // along the whole sweep, not just a single tap point.
+      eraserStrokeRef.current = [{ x, y }];
       eraseStrokeAt(x, y);
       return;
     }
@@ -617,6 +623,23 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       const dy = e.clientY - panStartRef.current.y;
       if (paperRef.current) {
         paperRef.current.style.transform = `translate(${dx}px, ${dy}px)`;
+      }
+      return;
+    }
+    // Eraser drag — erase along the swept path so you can rub a line out.
+    if (eraserPointerIdRef.current !== null && e.pointerId === eraserPointerIdRef.current) {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      eraserStrokeRef.current!.push({ x, y });
+      eraseStrokeAt(x, y);
+      // An eraser drag moved past the tap tolerance — it was erasing, not
+      // a tap, so clear the candidate to avoid a false double-tap later.
+      const tap = lastTapRef.current;
+      if (tap && Math.hypot(x - tap.x, y - tap.y) > TAP_RADIUS_PX) {
+        lastTapRef.current = null;
       }
       return;
     }
@@ -668,6 +691,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
         try { canvas.releasePointerCapture(e.pointerId); } catch { }
       }
       eraserPointerIdRef.current = null;
+      eraserStrokeRef.current = null; // eraser drag ended
     }
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
     stopDrawing();
@@ -682,14 +706,61 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     };
   }, [handleWindowPointerEnd]);
 
-  const eraseStrokeAt = (x: number, y: number) => {
+  // Marker eraser: removes only the ink the eraser actually rubs over,
+// leaving the rest of each stroke intact. A stroke is split into pieces
+// wherever the eraser path crosses it, so a rubbed line gets a gap rather
+// than vanishing wholesale. Also erases dictation/typed text annotations.
+const eraseStrokeAt = (x: number, y: number) => {
     const radius = 15;
-    const filteredStrokes = currentPage.strokes.filter((stroke) => {
-      return !stroke.points.some((pt) => Math.hypot(pt.x - x, pt.y - y) < radius);
-    });
-    if (filteredStrokes.length !== currentPage.strokes.length) {
-      const updatedPages = [...notebook.pages];
-      updatedPages[currentPageIndex] = { ...currentPage, strokes: filteredStrokes };
+    const path = eraserStrokeRef.current ?? [];
+    // Is this point close enough to the swept eraser path to be erased?
+    const isNearPath = (px: number, py: number) => {
+      if (path.length === 0) return Math.hypot(px - x, py - y) < radius;
+      // Sample every point the eraser has passed, so a fast drag that
+      // jumps between frames still erases the whole swept line.
+      for (let i = 0; i < path.length; i++) {
+        const a = path[i];
+        if (Math.hypot(px - a.x, py - a.y) < radius) return true;
+      }
+      return false;
+    };
+
+    const nb = notebookRef.current;
+    const idx = pageIndexRef.current;
+    const page = nb.pages[idx];
+
+    // Erase text annotations (dictation/typed text) under the eraser.
+    const textAnnotations = page.textAnnotations ?? [];
+    const keptText = textAnnotations.filter(
+      (ann) => !isNearPath(ann.x, ann.y)
+    );
+
+    // Split strokes: keep points outside the eraser, and break the stroke
+    // into consecutive runs so erased gaps show as actual gaps.
+    const newStrokes: Stroke[] = [];
+    for (const stroke of page.strokes) {
+      let run: StrokePoint[] = [];
+      const flush = () => {
+        if (run.length > 0) newStrokes.push({ ...stroke, points: run });
+        run = [];
+      };
+      for (const pt of stroke.points) {
+        if (isNearPath(pt.x, pt.y)) {
+          flush(); // gap starts here
+        } else {
+          run.push(pt);
+        }
+      }
+      flush();
+    }
+
+    if (keptText.length !== textAnnotations.length || newStrokes.length !== page.strokes.length) {
+      const updatedPages = [...nb.pages];
+      updatedPages[idx] = {
+        ...page,
+        strokes: newStrokes,
+        textAnnotations: keptText,
+      };
       updateCurrentNotebook(updatedPages);
     }
   };
