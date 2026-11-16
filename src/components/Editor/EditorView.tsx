@@ -1243,6 +1243,11 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
           <canvas
             ref={canvasRef}
             className="nohome-editor-canvas"
+            // iOS Safari still shows the "Copy/Translate" bubble on long
+            // presses even with -webkit-touch-callout: none in CSS. Hook
+            // contextmenu (fired on the long-press that spawns it) so we
+            // can stop it without touching the pointer/touch draw chain.
+            onContextMenu={(e) => e.preventDefault()}
             onPointerDown={startDrawing}
             onPointerMove={draw}
             onPointerUp={stopDrawing}
