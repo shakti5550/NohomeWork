@@ -71,6 +71,11 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // pointerdown can't be mistaken for a double-tap.
   const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const previousToolRef = useRef<Tool>('pen');
+  // Pointer id captured by an eraser tap. An eraser tap takes pointer
+  // capture but never sets isDrawingRef, so stopDrawing() returns early
+  // and would leak the capture forever — leaking it can swallow the next
+  // Pencil tap, which is why the "turn off" double-tap is unreliable.
+  const eraserPointerIdRef = useRef<number | null>(null);
   const paginationRef = useRef<HTMLDivElement | null>(null);
 
   // Track pointer position for dictation
@@ -585,6 +590,10 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     }
 
     if (tool === 'eraser') {
+      // An eraser tap takes pointer capture but never sets isDrawingRef,
+      // so stopDrawing() would return early and leak the capture. Track
+      // the id here so it gets released on pointer-up.
+      eraserPointerIdRef.current = e.pointerId;
       eraseStrokeAt(x, y);
       return;
     }
@@ -649,6 +658,17 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   };
 
   const handleWindowPointerEnd = useCallback((e: PointerEvent) => {
+    // Release a leaked eraser-tap pointer capture even though an eraser
+    // tap never sets activePointerIdRef (so stopDrawing() would return
+    // early without this). A leaked capture can swallow the next Pencil
+    // tap, which is what makes the "turn off" double-tap unreliable.
+    if (eraserPointerIdRef.current !== null && e.pointerId === eraserPointerIdRef.current) {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        try { canvas.releasePointerCapture(e.pointerId); } catch { }
+      }
+      eraserPointerIdRef.current = null;
+    }
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) return;
     stopDrawing();
   }, []);
