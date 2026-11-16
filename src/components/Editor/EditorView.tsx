@@ -5,7 +5,7 @@ import {
 } from '@mui/material';
 import {
   ArrowLeft, PenTool, Highlighter, Eraser, Plus, Trash2, ChevronLeft, ChevronRight,
-  Bot, X, Send, Pencil, Hand, LayoutGrid, Bookmark
+  Bot, X, Send, Hand, LayoutGrid, Bookmark
 } from 'lucide-react';
 import { Notebook, Page, Stroke, TextAnnotation, saveNotebook, ChatMessage } from '../../storage/cloud';
 import { ChatButton } from '../AIChat/ChatButton';
@@ -58,6 +58,12 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
   // Pagination state
   const paginationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  // Double-tap to toggle eraser: remembers the last tap time and position,
+  // plus the tool that was active before erasing, so a second tap can
+  // switch back to it. A drag (tap moved too far) never counts as a tap.
+  const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
+  const previousToolRef = useRef<Tool>('pen');
   const paginationRef = useRef<HTMLDivElement | null>(null);
 
   // Track pointer position for dictation
@@ -531,16 +537,41 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     try {
       canvas.setPointerCapture(e.pointerId);
     } catch { }
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setLastPointerPos({ x, y });
+
+    // Double-tap to toggle eraser. A tap is only counted if the pointer
+    // hasn't moved far from the previous tap (a drag is a stroke, not a tap).
+    const DOUBLE_TAP_MS = 300;
+    const TAP_RADIUS_PX = 12;
+    const now = Date.now();
+    const prev = lastTapRef.current;
+    const isDoubleTap =
+      prev &&
+      now - prev.time < DOUBLE_TAP_MS &&
+      Math.hypot(x - prev.x, y - prev.y) < TAP_RADIUS_PX;
+
+    if (isDoubleTap) {
+      if (tool === 'eraser') {
+        setTool(previousToolRef.current);
+      } else {
+        previousToolRef.current = tool;
+        setTool('eraser');
+      }
+      lastTapRef.current = { time: now, x, y };
+      return;
+    }
+    lastTapRef.current = { time: now, x, y };
+
     // Panning mode — move paper instead of drawing
     if (panning) {
       panStartRef.current = { x: e.clientX, y: e.clientY };
       isPanningActiveRef.current = true;
       return;
     }
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setLastPointerPos({ x, y });
 
     if (tool === 'eraser') {
       eraseStrokeAt(x, y);
@@ -942,6 +973,13 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
   // The floating controls, in vertical order. On short viewports the
   // stack collapses into a horizontal bottom row so nothing is clipped off.
+  // The Tools & Settings button shows the currently selected tool's icon,
+  // so the user always sees what's active at a glance.
+  const toolIconMap: Record<Tool, React.ReactNode> = {
+    pen: <PenTool size={20} />,
+    highlighter: <Highlighter size={20} />,
+    eraser: <Eraser size={20} />,
+  };
   const floatButtons: { comp: React.ElementType; props: Record<string, any> }[] = [
     {
       comp: FloatingBtn,
@@ -957,7 +995,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       props: {
         onClick: () => setToolDialogOpen(true),
         tooltip: 'Tools & Settings',
-        icon: <Pencil size={20} />,
+        icon: toolIconMap[tool],
         style: { top: 76, left: 6 },
       },
     },
