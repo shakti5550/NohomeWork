@@ -29,6 +29,11 @@ type Template = 'blank' | 'ruled' | 'grid' | 'dotted';
 // Predefined colors for the palette
 const PRESET_COLORS = ['#000000', '#dc2626', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777'];
 
+// Double-tap-to-eraser thresholds. Kept at component scope so both
+// startDrawing and draw use the same values.
+const DOUBLE_TAP_MS = 400;
+const TAP_RADIUS_PX = 30;
+
 export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpdateNotebook, initialPage, returnTo }) => {
   const { mode } = useThemeMode();
   const isLandscape = useMediaQuery('(orientation: landscape)');
@@ -61,7 +66,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
 
   // Double-tap to toggle eraser: remembers the last tap time and position,
   // plus the tool that was active before erasing, so a second tap can
-  // switch back to it. A drag (tap moved too far) never counts as a tap.
+  // switch back to it. A drag (tap moved too far) never counts as a tap —
+  // when a drag exceeds the tolerance, this ref is cleared so the next
+  // pointerdown can't be mistaken for a double-tap.
   const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const previousToolRef = useRef<Tool>('pen');
   const paginationRef = useRef<HTMLDivElement | null>(null);
@@ -533,20 +540,19 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (isDrawingRef.current) stopDrawing();
-    e.preventDefault();
-    try {
-      canvas.setPointerCapture(e.pointerId);
-    } catch { }
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     setLastPointerPos({ x, y });
 
-    // Double-tap to toggle eraser. A tap is only counted if the pointer
-    // hasn't moved far from the previous tap (a drag is a stroke, not a tap).
-    const DOUBLE_TAP_MS = 300;
-    const TAP_RADIUS_PX = 12;
+    // Double-tap to toggle eraser. Checked BEFORE preventDefault() /
+    // setPointerCapture() below: on iPad the Pencil's second tap can be
+    // disrupted by pointer capture, so the toggle must run on the clean
+    // event. A tap only counts if the pointer hasn't moved far from the
+    // previous tap — a drag is a stroke, not a tap. A drag also invalidates
+    // the pending tap candidate (see draw()), so a completed stroke can't
+    // be mistaken for a tap that the next stroke would trigger.
     const now = Date.now();
     const prev = lastTapRef.current;
     const isDoubleTap =
@@ -565,6 +571,11 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
       return;
     }
     lastTapRef.current = { time: now, x, y };
+
+    e.preventDefault();
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch { }
 
     // Panning mode — move paper instead of drawing
     if (panning) {
@@ -611,6 +622,15 @@ export const EditorView: React.FC<EditorViewProps> = ({ notebook, onBack, onUpda
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     setLastPointerPos({ x, y });
+    // If this drag moves past the tap tolerance, the pending tap
+    // candidate is no longer a tap — it was a stroke. Clear it so the
+    // next pointerdown can't be mistaken for a double-tap. This is what
+    // prevents a completed stroke's pointerdown from being a valid tap
+    // that the next stroke's pointerdown would trigger.
+    const tap = lastTapRef.current;
+    if (tap && Math.hypot(x - tap.x, y - tap.y) > TAP_RADIUS_PX) {
+      lastTapRef.current = null;
+    }
     const stroke = currentStrokeRef.current;
     const lastPt = stroke.points[stroke.points.length - 1];
     stroke.points.push({ x, y });
